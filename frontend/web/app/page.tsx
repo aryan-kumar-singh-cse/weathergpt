@@ -88,12 +88,17 @@ function MainDashboard() {
   }, [setLanguage])
 
   // Fetch weather data when location changes
-  const fetchWeather = useCallback(async (city: string) => {
+  const fetchWeather = useCallback(async (city: string, stateName?: string, customLat?: number, customLng?: number) => {
     setIsLoadingWeather(true)
     try {
-      const cityDetails = findCityDetails(city)
-      const lat = cityDetails?.lat
-      const lng = cityDetails?.lng
+      let lat = customLat
+      let lng = customLng
+
+      if (lat === undefined || lng === undefined) {
+        const cityDetails = findCityDetails(city)
+        lat = cityDetails?.lat
+        lng = cityDetails?.lng
+      }
 
       // 1. Current Weather
       const weatherRes = await getCurrentWeatherByCity(city)
@@ -128,6 +133,12 @@ function MainDashboard() {
     }
   }, [authState, selectedLocation, fetchWeather])
 
+  const handleLocationSelect = (loc: string, stateName?: string, lat?: number, lng?: number) => {
+    setSelectedLocation(loc)
+    localStorage.setItem("weathergpt_location", loc)
+    fetchWeather(loc, stateName, lat, lng)
+  }
+
   const handleLoginSuccess = (
     email: string,
     occupation: string,
@@ -153,12 +164,6 @@ function MainDashboard() {
     setUserName("")
     setUserOccupation("")
     toast.success("Logged out successfully")
-  }
-
-  const handleLocationSelect = (loc: string) => {
-    setSelectedLocation(loc)
-    localStorage.setItem("weathergpt_location", loc)
-    toast.success(`Location set to ${loc}`)
   }
 
   const handleProfileUpdated = (newLocation: string, newLang: string) => {

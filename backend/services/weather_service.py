@@ -121,6 +121,8 @@ class WeatherService:
             }
             days.append(day)
 
+        return {"days": days}
+
     async def fetch_30_day_outlook(self, lat: float, lng: float) -> Dict[str, Any]:
         """
         Fetch extended 30-day weather outlook with accuracy disclaimer.
@@ -213,19 +215,18 @@ class WeatherService:
 
     def classify_severity(self, weather_data: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Classify weather severity based on fixed thresholds.
-
-        Thresholds (from spec Section 3.6):
-        - Wind speed ≥ 62 km/h: High wind warning
-        - Temperature ≥ 45°C: Extreme heat
-        - Rain probability ≥ 80% AND accumulation ≥ 100mm: Heavy rain
-        - Temperature ≤ 0°C: Frost/freeze
-
-        Returns:
-            Dict with severity level and alerts list
+        Classify weather severity based on fixed thresholds:
+        - Wind speed >= 62 km/h: High wind warning
+        - Temperature >= 45C: Extreme heat
+        - Rain probability >= 80% AND accumulation >= 100mm: Heavy rain
+        - Temperature <= 0C: Frost/freeze
         """
-        current = weather_data.get("current", {})
-        forecast = weather_data.get("forecast", {}).get("days", [])
+        if not weather_data or not isinstance(weather_data, dict):
+            return {"severity": "normal", "alerts": [], "alert_count": 0}
+
+        current = weather_data.get("current") or {}
+        forecast_data = weather_data.get("forecast") or {}
+        forecast = forecast_data.get("days", []) if isinstance(forecast_data, dict) else []
 
         alerts = []
         severity = "normal"

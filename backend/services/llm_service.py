@@ -80,66 +80,70 @@ class LLMService:
 
         # Try Tier A (Primary - Groq)
         if primary_key and not primary_key.startswith("your-"):
-            try:
-                logger.info(f"🔄 Attempting PRIMARY tier (Groq: {self.primary_model})...")
-                primary_client = AsyncOpenAI(
-                    base_url=self.primary_base_url,
-                    api_key=primary_key
-                )
-                response = await self._call_with_timeout(
-                    primary_client,
-                    self.primary_model,
-                    messages,
-                    temperature,
-                    max_tokens,
-                    json_mode
-                )
-                self.last_tier_used = "primary"
-                logger.info(f"✅ PRIMARY tier successful ({len(response)} chars)")
-                return response
-            except Exception as e:
-                error_msg = f"Primary tier (Groq) failed: {type(e).__name__}: {str(e)}"
-                logger.warning(f"⚠️ {error_msg}. Retrying with Secondary fallback...")
-                errors.append(error_msg)
+            groq_models = [self.primary_model, "llama-3.3-70b-versatile", "llama-3.1-70b-versatile", "llama-3.1-8b-instant", "mixtral-8x7b-32768"]
+            primary_client = AsyncOpenAI(
+                base_url=self.primary_base_url,
+                api_key=primary_key
+            )
+            for m_name in dict.fromkeys(groq_models):
+                try:
+                    logger.info(f"🔄 Attempting PRIMARY tier (Groq: {m_name})...")
+                    response = await self._call_with_timeout(
+                        primary_client,
+                        m_name,
+                        messages,
+                        temperature,
+                        max_tokens,
+                        json_mode
+                    )
+                    self.last_tier_used = "primary"
+                    logger.info(f"✅ PRIMARY tier successful with {m_name} ({len(response)} chars)")
+                    return response
+                except Exception as e:
+                    error_msg = f"Groq ({m_name}) failed: {type(e).__name__}: {str(e)}"
+                    logger.warning(f"⚠️ {error_msg}")
+                    errors.append(error_msg)
         else:
             logger.info("ℹ️ Primary key not set, trying Secondary tier...")
 
         # Try Tier B (Secondary - Gemini)
         if secondary_key and not secondary_key.startswith("your-"):
-            try:
-                logger.info(f"🔄 Attempting SECONDARY tier (Gemini: {self.secondary_model})...")
-                secondary_client = AsyncOpenAI(
-                    base_url=self.secondary_base_url,
-                    api_key=secondary_key
-                )
-                response = await self._call_with_timeout(
-                    secondary_client,
-                    self.secondary_model,
-                    messages,
-                    temperature,
-                    max_tokens,
-                    json_mode
-                )
-                self.last_tier_used = "secondary"
-                logger.info(f"✅ SECONDARY tier successful ({len(response)} chars)")
-                return response
-            except Exception as e:
-                error_msg = f"Secondary tier (Gemini) failed: {type(e).__name__}: {str(e)}"
-                logger.error(f"❌ {error_msg}")
-                errors.append(error_msg)
+            gemini_models = [self.secondary_model, "gemini-1.5-flash", "gemini-2.5-flash", "gemini-2.0-flash"]
+            secondary_client = AsyncOpenAI(
+                base_url=self.secondary_base_url,
+                api_key=secondary_key
+            )
+            for g_model in dict.fromkeys(gemini_models):
+                try:
+                    logger.info(f"🔄 Attempting SECONDARY tier (Gemini: {g_model})...")
+                    response = await self._call_with_timeout(
+                        secondary_client,
+                        g_model,
+                        messages,
+                        temperature,
+                        max_tokens,
+                        json_mode
+                    )
+                    self.last_tier_used = "secondary"
+                    logger.info(f"✅ SECONDARY tier successful with {g_model} ({len(response)} chars)")
+                    return response
+                except Exception as e:
+                    error_msg = f"Gemini ({g_model}) failed: {type(e).__name__}: {str(e)}"
+                    logger.warning(f"⚠️ {error_msg}")
+                    errors.append(error_msg)
         else:
             logger.warning("⚠️ Secondary key not configured")
 
-        self.last_tier_used = "none"
+        self.last_tier_used = "rule_based"
 
-        # If no keys or all failed, provide a structured fallback for weather queries
+        # Safe fallback if LLMs are unavailable
         if json_mode:
             return json.dumps({
                 "place": "Delhi",
                 "language": "en",
                 "intent": "current",
                 "nationwide": False,
-                "confidence": 0.5
+                "confidence": 0.6
             })
 
         if not primary_key and not secondary_key:

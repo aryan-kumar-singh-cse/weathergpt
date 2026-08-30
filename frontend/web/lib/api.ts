@@ -175,18 +175,18 @@ export async function get30DayOutlook(
 }
 
 /**
- * Get weather alerts for location
+ * Reverse geocode GPS coordinates to city name
  */
-export async function getWeatherAlerts(
+export async function reverseGeocode(
   lat: number,
   lng: number
-): Promise<{ alerts: any[] }> {
+): Promise<{ city: string; state?: string; country?: string; display_name?: string }> {
   const response = await fetch(
-    `${API_BASE}/weather/alerts?lat=${lat}&lng=${lng}`
+    `${API_BASE}/weather/reverse-geocode?lat=${lat}&lng=${lng}`
   )
 
   if (!response.ok) {
-    throw new Error('Failed to fetch alerts')
+    throw new Error('Failed to reverse geocode location')
   }
 
   return response.json()

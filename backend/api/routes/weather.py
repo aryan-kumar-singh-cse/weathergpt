@@ -273,3 +273,19 @@ async def geocode_location(
     except Exception as e:
         logger.error(f"Geocoding error: {e}")
         raise HTTPException(status_code=500, detail="Geocoding failed")
+
+
+@router.get("/reverse-geocode")
+async def reverse_geocode_location(
+    lat: float = Query(..., ge=-90.0, le=90.0),
+    lng: float = Query(..., ge=-180.0, le=180.0)
+):
+    """
+    Reverse geocode real-time GPS coordinates to city, state, country.
+    """
+    try:
+        result = await geocoding_service.reverse_geocode(lat, lng)
+        return result
+    except Exception as e:
+        logger.error(f"Reverse geocoding error: {e}")
+        raise HTTPException(status_code=500, detail="Reverse geocoding failed")

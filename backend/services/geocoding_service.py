@@ -110,24 +110,73 @@ class GeocodingService:
         except httpx.TimeoutException:
             logger.warning(f"Geocoding timeout for '{place_name}', using fallback")
             return await self._fallback_geocode(place_name, country)
-        except Exception as e:
-            logger.warning(f"Geocoding failed for '{place_name}': {e}, trying fallback")
-            return await self._fallback_geocode(place_name, country)
-
-    async def _fallback_geocode(self, place_name: str, country: str) -> Dict[str, Any]:
-        """Fallback geocoding using cached city data."""
-        normalized = place_name.lower().strip()
-        if normalized in self._fallback_cities:
-            lat, lng, state = self._fallback_cities[normalized]
-            return {
+    async def reverse_geocode(self, lat: float, lng: float) -> Dict[str, Any]:
+        """
+        Reverse geocode coordinates (lat, lng) to a city/state in real-time.
+        """
+        try:
+            url = "https://nominatim.openstreetmap.org/reverse"
+            params = {
                 "lat": lat,
-                "lng": lng,
-                "place_name": place_name.title(),
-                "state": state,
-                "country": country,
-                "source": "fallback_cache"
+                "lon": lng,
+                "format": "json",
+                "addressdetails": 1,
+                "zoom": 10
             }
-        raise GeocodingError(f"Location '{place_name}' not found and no fallback available")
+            headers = {
+                "User-Agent": "WeatherGPT/1.0 (hackathon live location detector)"
+            }
+
+            async with httpx.AsyncClient(timeout=self.timeout) as client:
+                response = await client.get(url, params=params, headers=headers)
+                if response.status_code == 200:
+                    data = response.json()
+                    addr = data.get("address", {})
+                    city = (
+                        addr.get("city")
+                        or addr.get("town")
+                        or addr.get("suburb")
+                        or addr.get("village")
+                        or addr.get("municipality")
+                        or addr.get("county")
+                        or addr.get("state_district")
+                        or addr.get("state")
+                        or "Delhi"
+                    )
+                    state = addr.get("state", "")
+                    country = addr.get("country", "India")
+                    return {
+                        "lat": lat,
+                        "lng": lng,
+                        "city": city,
+                        "state": state,
+                        "country": country,
+                        "display_name": data.get("display_name", f"{city}, {state}"),
+                        "source": "nominatim_reverse"
+                    }
+        except Exception as e:
+            logger.warning(f"Reverse geocode HTTP failed: {e}, using nearest fallback city")
+
+        # Nearest city fallback
+        best_city = "Delhi"
+        best_state = "Delhi"
+        min_dist = float("inf")
+
+        for c_name, (c_lat, c_lng, c_state) in self._fallback_cities.items():
+            dist = (c_lat - lat) ** 2 + (c_lng - lng) ** 2
+            if dist < min_dist:
+                min_dist = dist
+                best_city = c_name.title()
+                best_state = c_state
+
+        return {
+            "lat": lat,
+            "lng": lng,
+            "city": best_city,
+            "state": best_state,
+            "country": "India",
+            "source": "nearest_fallback"
+        }
 
     def get_indian_states(self) -> Dict[str, str]:
         """Get Indian states and union territories."""
