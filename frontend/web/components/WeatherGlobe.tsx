@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useRef, useState, useEffect, Suspense } from "react";
+import React, { useRef, useState, useEffect, Suspense, useMemo } from "react";
 import { Canvas, useFrame } from "@react-three/fiber";
 import { OrbitControls, Sphere, useTexture } from "@react-three/drei";
 import * as THREE from "three";
@@ -13,6 +13,7 @@ type Props = {
   weatherCondition: WeatherCondition;
 };
 
+// Convert Lat/Lng to 3D Cartesian coordinates on sphere
 function latLngToVector3(lat: number, lng: number, radius: number) {
   const phi = (90 - lat) * (Math.PI / 180);
   const theta = (lng + 180) * (Math.PI / 180);
@@ -23,57 +24,117 @@ function latLngToVector3(lat: number, lng: number, radius: number) {
   );
 }
 
-function EarthMesh({ lat, lng, weatherCondition }: Props) {
-  const groupRef = useRef<THREE.Group>(null);
-  const earthMap = useTexture("/textures/earth-night.jpg");
+// Atmospheric Glow Shader (Fresnel Rayleigh effect)
+const AtmosphereShader = {
+  vertexShader: `
+    varying vec3 vNormal;
+    void main() {
+      vNormal = normalize(normalMatrix * normal);
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+    }
+  `,
+  fragmentShader: `
+    varying vec3 vNormal;
+    void main() {
+      float intensity = pow(0.65 - dot(vNormal, vec3(0, 0, 1.0)), 2.5);
+      gl_FragColor = vec4(0.3, 0.6, 1.0, 1.0) * intensity;
+    }
+  `,
+};
 
-  const cloudOpacity =
-    weatherCondition === "rainy" ? 0.85 : weatherCondition === "cloudy" ? 0.5 : 0.15;
+function PhotorealisticEarth({ lat, lng, weatherCondition }: Props) {
+  const earthGroupRef = useRef<THREE.Group>(null);
+  const cloudsRef = useRef<THREE.Mesh>(null);
 
+  // Load NASA Blue Marble textures
+  const [dayMap, nightMap, cloudsMap] = useTexture([
+    "/textures/earth-blue-marble.jpg",
+    "/textures/earth-night.jpg",
+    "/textures/earth-clouds.png",
+  ]);
+
+  // Adjust cloud opacity and lighting based on weather condition
+  const cloudOpacity = useMemo(() => {
+    if (weatherCondition === "rainy") return 0.65;
+    if (weatherCondition === "cloudy") return 0.45;
+    return 0.28;
+  }, [weatherCondition]);
+
+  // Auto rotation of Earth and realistic cloud movement
   useFrame((_, delta) => {
-    if (groupRef.current) {
-      groupRef.current.rotation.y += delta * 0.03;
+    if (earthGroupRef.current) {
+      earthGroupRef.current.rotation.y += delta * 0.02;
+    }
+    if (cloudsRef.current) {
+      cloudsRef.current.rotation.y += delta * 0.025;
     }
   });
 
-  const markerPos = latLngToVector3(lat, lng, 1.02);
+  const earthRadius = 2.4;
+  const markerPos = latLngToVector3(lat, lng, earthRadius + 0.02);
 
   return (
-    <group ref={groupRef}>
-      {/* Base Earth Sphere with Night Lights Texture */}
-      <Sphere args={[1, 64, 64]}>
-        <meshStandardMaterial map={earthMap} roughness={0.7} metalness={0.1} />
-      </Sphere>
-
-      {/* Dynamic Cloud Atmosphere Sphere */}
-      <Sphere args={[1.02, 64, 64]}>
-        <meshStandardMaterial
-          color="#ffffff"
+    <group position={[0, -1.9, 0]}>
+      {/* Atmosphere Outer Glow Halo */}
+      <Sphere args={[earthRadius * 1.06, 64, 64]}>
+        <shaderMaterial
+          vertexShader={AtmosphereShader.vertexShader}
+          fragmentShader={AtmosphereShader.fragmentShader}
+          blending={THREE.AdditiveBlending}
+          side={THREE.BackSide}
           transparent
-          opacity={cloudOpacity}
-          depthWrite={false}
         />
       </Sphere>
 
-      {/* Orange GPS/Location Marker Pin */}
-      <mesh position={markerPos}>
-        <sphereGeometry args={[0.025, 16, 16]} />
-        <meshBasicMaterial color="#f97316" />
-      </mesh>
+      <group ref={earthGroupRef}>
+        {/* Main Blue Marble Earth Surface */}
+        <Sphere args={[earthRadius, 64, 64]}>
+          <meshStandardMaterial
+            map={dayMap}
+            roughness={0.65}
+            metalness={0.15}
+            bumpScale={0.05}
+          />
+        </Sphere>
+
+        {/* Photorealistic Atmospheric Cloud Layer */}
+        <Sphere ref={cloudsRef} args={[earthRadius + 0.015, 64, 64]}>
+          <meshStandardMaterial
+            map={cloudsMap}
+            transparent
+            opacity={cloudOpacity}
+            blending={THREE.AdditiveBlending}
+            depthWrite={false}
+          />
+        </Sphere>
+
+        {/* Location Pin Marker with Glowing Ring */}
+        <group position={markerPos}>
+          <mesh>
+            <sphereGeometry args={[0.03, 16, 16]} />
+            <meshBasicMaterial color="#f59e0b" />
+          </mesh>
+          <mesh>
+            <ringGeometry args={[0.04, 0.06, 32]} />
+            <meshBasicMaterial color="#fbbf24" side={THREE.DoubleSide} transparent opacity={0.8} />
+          </mesh>
+        </group>
+      </group>
     </group>
   );
 }
 
-function FallbackEarth({ lat, lng, weatherCondition }: Props) {
-  const markerPos = latLngToVector3(lat, lng, 1.02);
+function FallbackHorizonEarth({ lat, lng }: Props) {
+  const earthRadius = 2.4;
+  const markerPos = latLngToVector3(lat, lng, earthRadius + 0.02);
   return (
-    <group>
-      <Sphere args={[1, 32, 32]}>
-        <meshStandardMaterial color="#1e293b" wireframe />
+    <group position={[0, -1.9, 0]}>
+      <Sphere args={[earthRadius, 32, 32]}>
+        <meshStandardMaterial color="#0f2b48" roughness={0.7} />
       </Sphere>
       <mesh position={markerPos}>
-        <sphereGeometry args={[0.025, 16, 16]} />
-        <meshBasicMaterial color="#f97316" />
+        <sphereGeometry args={[0.03, 16, 16]} />
+        <meshBasicMaterial color="#f59e0b" />
       </mesh>
     </group>
   );
@@ -89,17 +150,26 @@ export default function WeatherGlobe({ lat, lng, weatherCondition }: Props) {
   }, []);
 
   return (
-    <Canvas camera={{ position: [0, 0.3, 3], fov: 45 }} dpr={dpr}>
-      <ambientLight intensity={0.6} />
-      <directionalLight position={[5, 3, 5]} intensity={1.5} />
-      <Suspense fallback={<FallbackEarth lat={lat} lng={lng} weatherCondition={weatherCondition} />}>
-        <EarthMesh lat={lat} lng={lng} weatherCondition={weatherCondition} />
+    <Canvas
+      camera={{ position: [0, 0.5, 3.2], fov: 45 }}
+      dpr={dpr}
+      gl={{ antialias: true, alpha: true }}
+    >
+      <ambientLight intensity={0.45} />
+      {/* Sunlight coming from space */}
+      <directionalLight position={[6, 4, 3]} intensity={2.2} color="#ffffff" />
+      {/* Subtle blue space rim bounce */}
+      <directionalLight position={[-4, 2, -2]} intensity={0.6} color="#38bdf8" />
+
+      <Suspense fallback={<FallbackHorizonEarth lat={lat} lng={lng} weatherCondition={weatherCondition} />}>
+        <PhotorealisticEarth lat={lat} lng={lng} weatherCondition={weatherCondition} />
       </Suspense>
+
       <OrbitControls
         enableZoom={false}
         enablePan={false}
-        minPolarAngle={Math.PI / 3}
-        maxPolarAngle={Math.PI / 1.6}
+        minPolarAngle={Math.PI / 3.5}
+        maxPolarAngle={Math.PI / 1.7}
       />
     </Canvas>
   );

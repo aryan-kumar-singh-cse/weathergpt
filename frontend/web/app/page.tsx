@@ -234,12 +234,13 @@ export default function Home() {
       )}
 
       {/* Floating Collapsible Chat Input Bar (Bottom-Center) */}
-      <div className="absolute bottom-8 md:bottom-10 left-1/2 -translate-x-1/2 z-20 w-[92%] max-w-2xl">
+      <div className="absolute bottom-6 md:bottom-8 left-1/2 -translate-x-1/2 z-20 w-[94%] max-w-2xl">
         <ChatInputBar
           onSend={(msg) => handleSend(msg)}
           isLoading={isLoading}
           latestResponse={result?.response}
           role={preferences.occupation}
+          city={result?.city ?? preferences.defaultLocation ?? "Delhi"}
         />
       </div>
     </main>

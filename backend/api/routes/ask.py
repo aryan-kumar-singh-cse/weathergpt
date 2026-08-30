@@ -171,12 +171,15 @@ async def ask_weather_question(
     if not request.email or not request.email.strip():
         raise HTTPException(status_code=401, detail="Email is required. Please login first.")
 
-    # Check if user exists
+    # Check if user exists or auto-create seamlessly
     user = auth_service.get_user(request.email, db)
     if not user:
-        raise HTTPException(
-            status_code=401,
-            detail="User not found. Please login with your email and occupation first."
+        user = auth_service.login_or_create_user(
+            email=request.email,
+            occupation=request.role.title(),
+            location=request.location or "Delhi",
+            preferred_language=request.language or "en",
+            db=db
         )
 
     # Check rate limit (20 requests per rolling 24h window)
