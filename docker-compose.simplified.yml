@@ -1,0 +1,46 @@
+# Simplified Docker Compose for quick demo
+# Backend + minimal dependencies only
+
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    container_name: weathergpt-backend-demo
+    environment:
+      DATABASE_URL: postgresql://weathergpt:weathergpt_password@postgres:5432/weathergpt
+      REDIS_URL: redis://redis:6379
+      LLM_PRIMARY_BASE_URL: ${LLM_PRIMARY_BASE_URL}
+      LLM_PRIMARY_MODEL: ${LLM_PRIMARY_MODEL:-llama-3.1-70b-versatile}
+      LLM_PRIMARY_API_KEY: ${LLM_PRIMARY_API_KEY}
+      LLM_SECONDARY_BASE_URL: ${LLM_SECONDARY_BASE_URL}
+      LLM_SECONDARY_MODEL: ${LLM_SECONDARY_MODEL:-gemini-1.5-flash}
+      LLM_SECONDARY_API_KEY: ${LLM_SECONDARY_API_KEY}
+      API_SECRET_KEY: ${API_SECRET_KEY:-demo-secret}
+      API_DEBUG: "true"
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app/backend
+    restart: unless-stopped
+
+  postgres:
+    image: timescaledb:latest-pg16
+    environment:
+      POSTGRES_USER: weathergpt
+      POSTGRES_PASSWORD: weathergpt_password
+      POSTGRES_DB: weathergpt
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+
+volumes:
+  postgres_data:

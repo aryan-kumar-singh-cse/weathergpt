@@ -1,0 +1,134 @@
+# WeatherGPT - Complete Docker Compose Configuration
+# Includes: Backend API, Frontend, Database (optional)
+# For SIH 2024 Hackathon Demonstration
+
+version: '3.8'
+
+services:
+  # Backend API (FastAPI)
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    container_name: weathergpt-backend
+    ports:
+      - "8000:8000"
+    environment:
+      # LLM Configuration (Two-tier: Groq → Gemini)
+      LLM_PRIMARY_BASE_URL: ${LLM_PRIMARY_BASE_URL:-https://api.groq.com/openai/v1}
+      LLM_PRIMARY_MODEL: ${LLM_PRIMARY_MODEL:-openai/gpt-oss-20b}
+      LLM_PRIMARY_API_KEY: ${LLM_PRIMARY_API_KEY}
+
+      LLM_SECONDARY_BASE_URL: ${LLM_SECONDARY_BASE_URL:-https://generativelanguage.googleapis.com/v1beta/openai/}
+      LLM_SECONDARY_MODEL: ${LLM_SECONDARY_MODEL:-gemini-2.0-flash}
+      LLM_SECONDARY_API_KEY: ${LLM_SECONDARY_API_KEY}
+
+      # Database Configuration (SQLite by default)
+      DATABASE_URL: ${DATABASE_URL:-sqlite:////app/data/weathergpt.db}
+
+      # API Configuration
+      API_SECRET_KEY: ${API_SECRET_KEY:-weathergpt-secret-key-change-in-production}
+      API_DEBUG: ${API_DEBUG:-false}
+
+      # Voice Configuration
+      STT_PROVIDER: ${STT_PROVIDER:-groq}
+      TTS_PROVIDER: ${TTS_PROVIDER:-web}
+
+      # SMS Configuration (disabled by default)
+      SMS_ENABLED: ${SMS_ENABLED:-false}
+      SMS_PROVIDER: ${SMS_PROVIDER:-mock}
+      TWILIO_ACCOUNT_SID: ${TWILIO_ACCOUNT_SID:-}
+      TWILIO_AUTH_TOKEN: ${TWILIO_AUTH_TOKEN:-}
+      TWILIO_PHONE_NUMBER: ${TWILIO_PHONE_NUMBER:-}
+
+    volumes:
+      - ./data:/app/data  # Persist SQLite database
+      - ./backend:/app/backend  # Hot reload for development
+
+    networks:
+      - weathergpt-network
+
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+    restart: unless-stopped
+
+  # Frontend (Next.js)
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000/api/v1}
+    container_name: weathergpt-frontend
+    ports:
+      - "3000:3000"
+    environment:
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000/api/v1}
+
+    depends_on:
+      backend:
+        condition: service_healthy
+
+    networks:
+      - weathergpt-network
+
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+    restart: unless-stopped
+
+  # PostgreSQL Database (Optional - for production)
+  # Uncomment to use PostgreSQL instead of SQLite
+  # postgres:
+  #   image: postgres:16-alpine
+  #   container_name: weathergpt-postgres
+  #   environment:
+  #     POSTGRES_USER: weathergpt
+  #     POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-weathergpt_password}
+  #     POSTGRES_DB: weathergpt
+  #   ports:
+  #     - "5432:5432"
+  #   volumes:
+  #     - postgres_data:/var/lib/postgresql/data
+  #   networks:
+  #     - weathergpt-network
+  #   healthcheck:
+  #     test: ["CMD-SHELL", "pg_isready -U weathergpt"]
+  #     interval: 10s
+  #     timeout: 5s
+  #     retries: 5
+  #   restart: unless-stopped
+
+  # Redis Cache (Optional - for caching)
+  # redis:
+  #   image: redis:7-alpine
+  #   container_name: weathergpt-redis
+  #   ports:
+  #     - "6379:6379"
+  #   volumes:
+  #     - redis_data:/data
+  #   networks:
+  #     - weathergpt-network
+  #   healthcheck:
+  #     test: ["CMD", "redis-cli", "ping"]
+  #     interval: 10s
+  #     timeout: 5s
+  #     retries: 5
+  #   restart: unless-stopped
+
+networks:
+  weathergpt-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  redis_data:

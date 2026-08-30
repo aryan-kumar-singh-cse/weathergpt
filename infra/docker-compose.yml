@@ -1,0 +1,114 @@
+# WeatherGPT Docker Compose for Local Development
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: timescale/timescaledb:latest-pg16
+    container_name: weathergpt-postgres
+    environment:
+      POSTGRES_USER: weathergpt
+      POSTGRES_PASSWORD: weathergpt_password
+      POSTGRES_DB: weathergpt
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./backend/models/schema.sql:/docker-entrypoint-initdb.d/schema.sql
+    networks:
+      - weathergpt-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U weathergpt"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: weathergpt-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - weathergpt-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Backend API
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    container_name: weathergpt-backend
+    environment:
+      DATABASE_URL: postgresql://weathergpt:weathergpt_password@postgres:5432/weathergpt
+      REDIS_URL: redis://redis:6379
+      API_SECRET_KEY: ${API_SECRET_KEY}
+      API_DEBUG: "true"
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - weathergpt-network
+    volumes:
+      - ./backend:/app
+    command: uvicorn api.main:app --host 0.0.0.0 --port 8000 --reload
+
+  # Frontend Development Server
+  frontend:
+    build:
+      context: ./frontend/web
+      dockerfile: Dockerfile
+    container_name: weathergpt-frontend
+    ports:
+      - "3000:3000"
+    environment:
+      REACT_APP_API_URL: http://localhost:8000
+    depends_on:
+      - backend
+    networks:
+      - weathergpt-network
+    volumes:
+      - ./frontend/web:/app
+      - /app/node_modules
+
+  # Nginx Reverse Proxy (Optional)
+  nginx:
+    image: nginx:alpine
+    container_name: weathergpt-nginx
+    ports:
+      - "80:80"
+    volumes:
+      - ./infra/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - backend
+      - frontend
+    networks:
+      - weathergpt-network
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  weathergpt-network:
+    driver: bridge
+
+# Development overrides
+x-dev: &dev
+  API_DEBUG: "true"
+  LOG_LEVEL: "debug"
+
+# Production overrides
+x-prod: &prod
+  API_DEBUG: "false"
+  LOG_LEVEL: "info"

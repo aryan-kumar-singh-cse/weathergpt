@@ -1,0 +1,198 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Warm coral/teal theme - Light mode */
+    --background: 0 0% 100%;
+    --foreground: 220 26% 14%;
+    --card: 0 0% 100%;
+    --card-foreground: 220 26% 14%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 220 26% 14%;
+    --primary: 174 62% 47%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 14 91% 65%;
+    --secondary-foreground: 0 0% 100%;
+    --muted: 174 35% 96%;
+    --muted-foreground: 220 16% 46%;
+    --accent: 41 96% 63%;
+    --accent-foreground: 220 26% 14%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 174 25% 88%;
+    --input: 174 25% 88%;
+    --ring: 174 62% 47%;
+    --radius: 0.75rem;
+
+    /* Custom tokens */
+    --coral: 14 91% 65%;
+    --teal: 174 62% 47%;
+    --amber: 41 96% 63%;
+    --slate: 220 26% 14%;
+  }
+
+  .dark {
+    /* Dark mode - Deep navy with vibrant accents */
+    --background: 222 47% 11%;
+    --foreground: 174 35% 96%;
+    --card: 222 47% 11%;
+    --card-foreground: 174 35% 96%;
+    --popover: 222 47% 11%;
+    --popover-foreground: 174 35% 96%;
+    --primary: 174 62% 52%;
+    --primary-foreground: 222 47% 11%;
+    --secondary: 14 91% 68%;
+    --secondary-foreground: 222 47% 11%;
+    --muted: 220 26% 18%;
+    --muted-foreground: 174 20% 70%;
+    --accent: 41 96% 68%;
+    --accent-foreground: 222 47% 11%;
+    --destructive: 0 84% 65%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 220 26% 22%;
+    --input: 220 26% 22%;
+    --ring: 174 62% 52%;
+
+    /* Custom tokens */
+    --coral: 14 91% 68%;
+    --teal: 174 62% 52%;
+    --amber: 41 96% 68%;
+    --slate: 174 35% 96%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+/* Accessibility: Respect prefers-reduced-motion */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  @apply bg-muted;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-muted-foreground/30 rounded-full;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  @apply bg-muted-foreground/50;
+}
+
+/* Animations */
+@keyframes weather-pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+@keyframes cloud-drift {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-100px);
+  }
+}
+
+@keyframes rain-fall {
+  0% {
+    transform: translateY(-10px);
+    opacity: 0;
+  }
+  10% {
+    opacity: 1;
+  }
+  90% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(10px);
+    opacity: 0;
+  }
+}
+
+@keyframes sun-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.animate-weather-pulse {
+  animation: weather-pulse 2s ease-in-out infinite;
+}
+
+.animate-cloud-drift {
+  animation: cloud-drift 20s linear infinite;
+}
+
+.animate-rain-fall {
+  animation: rain-fall 1.5s linear infinite;
+}
+
+.animate-spin-slow {
+  animation: sun-spin 12s linear infinite;
+}
+
+/* Glassmorphism - Updated for new theme */
+.glass {
+  @apply bg-white/60 backdrop-blur-xl border border-teal-200/40 shadow-xl;
+}
+
+.dark .glass {
+  @apply bg-slate-950/60 border border-teal-500/20 shadow-2xl;
+}
+
+/* Gradient utilities */
+.gradient-coral-teal {
+  background: linear-gradient(135deg, hsl(var(--coral)) 0%, hsl(var(--teal)) 100%);
+}
+
+.gradient-teal-amber {
+  background: linear-gradient(135deg, hsl(var(--teal)) 0%, hsl(var(--amber)) 100%);
+}
+
+.gradient-mesh {
+  background:
+    radial-gradient(at 0% 0%, hsl(var(--coral) / 0.15) 0px, transparent 50%),
+    radial-gradient(at 100% 0%, hsl(var(--teal) / 0.15) 0px, transparent 50%),
+    radial-gradient(at 100% 100%, hsl(var(--amber) / 0.15) 0px, transparent 50%),
+    radial-gradient(at 0% 100%, hsl(var(--teal) / 0.15) 0px, transparent 50%);
+}
+
+.dark .gradient-mesh {
+  background:
+    radial-gradient(at 0% 0%, hsl(var(--coral) / 0.08) 0px, transparent 50%),
+    radial-gradient(at 100% 0%, hsl(var(--teal) / 0.08) 0px, transparent 50%),
+    radial-gradient(at 100% 100%, hsl(var(--amber) / 0.08) 0px, transparent 50%),
+    radial-gradient(at 0% 100%, hsl(var(--teal) / 0.08) 0px, transparent 50%);
+}
