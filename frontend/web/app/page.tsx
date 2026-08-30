@@ -1,332 +1,247 @@
-"use client"
+"use client";
 
-import React, { useState, useEffect, useCallback } from "react"
-import { Cloud, Moon, Sun, User, Settings, LogOut, ShieldAlert } from "lucide-react"
-import { toast } from "react-hot-toast"
-import { useTheme } from "next-themes"
-import ErrorBoundary from "@/components/ErrorBoundary"
-import ThemeProvider from "@/components/ThemeProvider"
-import { LanguageProvider, useTranslation } from "@/lib/i18n"
-import WeatherCard from "@/components/WeatherCard"
-import ChatInterface from "@/components/ChatInterface"
-import LocationSelector from "@/components/LocationSelector"
-import RoleSelector from "@/components/RoleSelector"
-import SeverityBanner from "@/components/SeverityBanner"
-import LoginCard from "@/components/LoginCard"
-import ProfileModal from "@/components/ProfileModal"
-import { getCurrentWeatherByCity, get30DayOutlook, getUserStatus } from "@/lib/api"
-import { findCityDetails } from "@/lib/india-locations"
-import { ForecastDay, Outlook30Data } from "@/lib/types"
+import React, { useState, useEffect, useCallback } from "react";
+import dynamic from "next/dynamic";
+import Header from "@/components/Header";
+import WeatherSummaryCard from "@/components/WeatherSummaryCard";
+import InfoStrip from "@/components/InfoStrip";
+import ForecastStrip, { ForecastDay } from "@/components/ForecastStrip";
+import ChatInputBar from "@/components/ChatInputBar";
+import { Preferences } from "@/components/SettingsPanel";
+import type { WeatherCondition } from "@/components/WeatherGlobe";
+import { reverseGeocode, get30DayOutlook } from "@/lib/api";
+import { toast, Toaster } from "react-hot-toast";
 
-function MainDashboard() {
-  const { theme, setTheme } = useTheme()
-  const { t, language, setLanguage } = useTranslation()
-  const [mounted, setMounted] = useState(false)
+// Client-side only 3D Globe import
+const WeatherGlobe = dynamic(() => import("@/components/WeatherGlobe"), {
+  ssr: false,
+  loading: () => (
+    <div className="absolute inset-0 bg-gradient-to-b from-[#0a0e2e] via-[#141a24] to-black" />
+  ),
+});
 
-  // Authentication State
-  const [authState, setAuthState] = useState<"checking" | "authenticated" | "unauthenticated">("checking")
-  const [userEmail, setUserEmail] = useState("")
-  const [userName, setUserName] = useState("")
-  const [userOccupation, setUserOccupation] = useState("")
+const gradients: Record<WeatherCondition, string> = {
+  clear: "from-[#0a0e2e] via-[#1a2456] to-[#2d3f7a]",
+  cloudy: "from-[#141a24] via-[#2a3442] to-[#3d4a5c]",
+  rainy: "from-black via-[#0d1218] to-[#1a2530]",
+};
 
-  // Location & Preferences
-  const [selectedLocation, setSelectedLocation] = useState("Delhi")
-  const [role, setRole] = useState("citizen")
-  const [isProfileOpen, setIsProfileOpen] = useState(false)
-
-  // Weather Data State
-  const [currentWeather, setCurrentWeather] = useState<any>(null)
-  const [forecastDays, setForecastDays] = useState<ForecastDay[]>([])
-  const [outlook30, setOutlook30] = useState<Outlook30Data | null>(null)
-  const [alerts, setAlerts] = useState<string[]>([])
-  const [severityLevel, setSeverityLevel] = useState<"normal" | "watch" | "warning" | "severe" | "extreme">("normal")
-  const [isLoadingWeather, setIsLoadingWeather] = useState(false)
-
-  useEffect(() => {
-    setMounted(true)
-  }, [])
-
-  // Check stored credentials on mount (prefer locally persisted values, verify session via backend)
-  useEffect(() => {
-    const initAuth = async () => {
-      try {
-        const storedEmail = localStorage.getItem("weathergpt_email")
-        const storedName = localStorage.getItem("weathergpt_name") || ""
-        const storedOccupation = localStorage.getItem("weathergpt_occupation") || ""
-        const storedLocation = localStorage.getItem("weathergpt_location") || "Delhi"
-        const storedLanguage = localStorage.getItem("weathergpt_language") || "en"
-
-        if (storedEmail) {
-          // Immediately populate local values for display
-          setUserEmail(storedEmail)
-          setUserName(storedName)
-          setUserOccupation(storedOccupation)
-          setSelectedLocation(storedLocation)
-          setLanguage(storedLanguage)
-
-          // Verify session with backend
-          try {
-            const status = await getUserStatus(storedEmail)
-            if (status && status.exists) {
-              setAuthState("authenticated")
-            } else {
-              setAuthState("unauthenticated")
-            }
-          } catch (backendError) {
-            // Backend offline/unreachable: trust local cached credentials
-            setAuthState("authenticated")
-          }
-        } else {
-          setAuthState("unauthenticated")
-        }
-      } catch (error) {
-        setAuthState("unauthenticated")
-      }
-    }
-
-    initAuth()
-  }, [setLanguage])
-
-  // Fetch weather data when location changes
-  const fetchWeather = useCallback(async (city: string, stateName?: string, customLat?: number, customLng?: number) => {
-    setIsLoadingWeather(true)
-    try {
-      let lat = customLat
-      let lng = customLng
-
-      if (lat === undefined || lng === undefined) {
-        const cityDetails = findCityDetails(city)
-        lat = cityDetails?.lat
-        lng = cityDetails?.lng
-      }
-
-      // 1. Current Weather
-      const weatherRes = await getCurrentWeatherByCity(city)
-      setCurrentWeather(weatherRes.current || null)
-
-      // 2. 7-Day Forecast
-      const forecast = weatherRes.forecast?.daily || []
-      setForecastDays(forecast)
-
-      // 3. 30-Day Outlook
-      try {
-        const outlookRes = await get30DayOutlook(lat, lng, city)
-        setOutlook30(outlookRes)
-      } catch (e) {
-        setOutlook30(null)
-      }
-
-      // 4. Alerts & Severity
-      const alertList = (weatherRes.severity?.alerts as string[]) || []
-      setAlerts(alertList)
-      setSeverityLevel(weatherRes.severity?.severity || "normal")
-    } catch (error: any) {
-      toast.error(error?.message || "Failed to load weather data")
-    } finally {
-      setIsLoadingWeather(false)
-    }
-  }, [])
-
-  useEffect(() => {
-    if (authState === "authenticated" && selectedLocation) {
-      fetchWeather(selectedLocation)
-    }
-  }, [authState, selectedLocation, fetchWeather])
-
-  const handleLocationSelect = (loc: string, stateName?: string, lat?: number, lng?: number) => {
-    setSelectedLocation(loc)
-    localStorage.setItem("weathergpt_location", loc)
-    fetchWeather(loc, stateName, lat, lng)
-  }
-
-  const handleLoginSuccess = (
-    email: string,
-    occupation: string,
-    name?: string,
-    location?: string,
-    prefLang?: string
-  ) => {
-    setUserEmail(email)
-    setUserOccupation(occupation)
-    if (name) setUserName(name)
-    if (location) setSelectedLocation(location)
-    if (prefLang) setLanguage(prefLang)
-    setAuthState("authenticated")
-    toast.success(`Welcome to WeatherGPT!`)
-  }
-
-  const handleLogout = () => {
-    localStorage.removeItem("weathergpt_email")
-    localStorage.removeItem("weathergpt_name")
-    localStorage.removeItem("weathergpt_occupation")
-    setAuthState("unauthenticated")
-    setUserEmail("")
-    setUserName("")
-    setUserOccupation("")
-    toast.success("Logged out successfully")
-  }
-
-  const handleProfileUpdated = (newLocation: string, newLang: string) => {
-    setSelectedLocation(newLocation)
-    setLanguage(newLang)
-  }
-
-  if (authState === "checking") {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-white dark:bg-black">
-        <div className="text-center space-y-4">
-          <div className="w-16 h-16 bg-yellow-400 rounded-2xl flex items-center justify-center shadow-2xl mx-auto animate-pulse">
-            <Cloud className="w-8 h-8 text-black" />
-          </div>
-          <p className="text-sm font-semibold text-gray-700 dark:text-gray-300">
-            {t("loading")}
-          </p>
-        </div>
-      </div>
-    )
-  }
-
-  if (authState === "unauthenticated") {
-    return <LoginCard onLoginSuccess={handleLoginSuccess} />
-  }
-
-  return (
-    <div className="min-h-screen bg-gray-50/50 dark:bg-black text-gray-900 dark:text-gray-100 transition-colors duration-300 flex flex-col">
-      {/* Top Navigation Bar */}
-      <header className="sticky top-0 z-40 bg-white/80 dark:bg-gray-900/80 backdrop-blur-xl border-b border-gray-200 dark:border-yellow-500/20">
-        <div className="container mx-auto px-4 py-3.5 flex items-center justify-between">
-          {/* Logo & Title */}
-          <div className="flex items-center gap-3">
-            <div className="w-11 h-11 bg-gradient-to-br from-yellow-400 to-yellow-500 rounded-2xl flex items-center justify-center shadow-lg shadow-yellow-500/20">
-              <Cloud className="w-6 h-6 text-black" />
-            </div>
-            <div>
-              <h1 className="text-lg font-black text-gray-900 dark:text-white leading-tight">
-                WeatherGPT
-              </h1>
-              <p className="text-[11px] font-semibold text-yellow-600 dark:text-yellow-400">
-                {t("app_subtitle")}
-              </p>
-            </div>
-          </div>
-
-          {/* User Controls */}
-          <div className="flex items-center gap-2.5 sm:gap-3">
-            {/* User Badge */}
-            <button
-              type="button"
-              onClick={() => setIsProfileOpen(true)}
-              className="flex items-center gap-2 px-3.5 py-1.5 bg-gray-100 dark:bg-gray-800 hover:bg-yellow-50 dark:hover:bg-yellow-900/20 border border-gray-200 dark:border-gray-700 rounded-full text-xs font-semibold transition-all group"
-            >
-              <User className="w-3.5 h-3.5 text-yellow-500" />
-              <span className="max-w-[120px] truncate">{userName || userOccupation || userEmail}</span>
-              <Settings className="w-3.5 h-3.5 text-gray-400 group-hover:text-yellow-500 transition-colors ml-0.5" />
-            </button>
-
-            {/* Dark Mode Switcher */}
-            {mounted && (
-              <button
-                type="button"
-                onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-                className="p-2.5 rounded-2xl bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 transition-colors"
-                aria-label="Toggle theme"
-              >
-                {theme === "dark" ? (
-                  <Sun className="w-4 h-4 text-yellow-400" />
-                ) : (
-                  <Moon className="w-4 h-4 text-gray-600" />
-                )}
-              </button>
-            )}
-
-            {/* Logout Button */}
-            <button
-              type="button"
-              onClick={handleLogout}
-              className="p-2.5 rounded-2xl bg-gray-100 dark:bg-gray-800 hover:bg-red-50 dark:hover:bg-red-900/20 text-gray-600 hover:text-red-600 dark:text-gray-400 dark:hover:text-red-400 transition-colors"
-              title={t("logout")}
-            >
-              <LogOut className="w-4 h-4" />
-            </button>
-          </div>
-        </div>
-      </header>
-
-      {/* Main Grid Content */}
-      <main className="container mx-auto px-4 py-6 flex-1">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-          {/* Left Column: Weather Intelligence & Forecasts (7 cols) */}
-          <div className="lg:col-span-7 space-y-6">
-            {/* Severity Alert Banner */}
-            <SeverityBanner severity={severityLevel} alerts={alerts} />
-
-            {/* Main Weather Card (Current + 7-day + 30-day) */}
-            <WeatherCard
-              weather={currentWeather}
-              forecastDays={forecastDays}
-              outlook30={outlook30}
-              locationName={selectedLocation}
-              isLoading={isLoadingWeather}
-            />
-          </div>
-
-          {/* Right Column: Location, Persona & AI Chat (5 cols) */}
-          <div className="lg:col-span-5 space-y-5">
-            {/* Location Selector (State -> City hierarchical overlay) */}
-            <div className="bg-white/80 dark:bg-gray-900/80 backdrop-blur-xl rounded-3xl p-4 border border-gray-200 dark:border-yellow-500/20 shadow-xl space-y-2">
-              <div className="text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300">
-                {t("location")}
-              </div>
-              <LocationSelector
-                selectedLocation={selectedLocation}
-                onSelect={handleLocationSelect}
-              />
-            </div>
-
-            {/* Persona / Role Selector */}
-            <RoleSelector value={role} onChange={setRole} />
-
-            {/* AI Conversational Assistant */}
-            <ChatInterface
-              location={selectedLocation}
-              role={role}
-              language={language}
-              email={userEmail}
-              onAuthError={() => setAuthState("unauthenticated")}
-            />
-          </div>
-        </div>
-      </main>
-
-      {/* Profile Management Modal */}
-      <ProfileModal
-        isOpen={isProfileOpen}
-        onClose={() => setIsProfileOpen(false)}
-        email={userEmail}
-        currentLocation={selectedLocation}
-        currentLanguage={language}
-        onProfileUpdated={handleProfileUpdated}
-      />
-
-      {/* Footer */}
-      <footer className="border-t border-gray-200 dark:border-yellow-500/20 py-4 bg-white/50 dark:bg-gray-950/50 backdrop-blur-sm mt-auto">
-        <div className="container mx-auto px-4 flex flex-col sm:flex-row items-center justify-between text-xs text-gray-500 dark:text-gray-400 gap-2">
-          <span>WeatherGPT © 2026 • SIH26068 AI Weather Intelligence</span>
-          <span>Zero-Config Multi-Tier LLM Architecture</span>
-        </div>
-      </footer>
-    </div>
-  )
-}
+type WeatherResult = {
+  city: string;
+  temp: number;
+  feelsLike?: number;
+  humidity?: number;
+  windSpeed?: number;
+  pressure?: number;
+  condition: string;
+  rainChance?: number;
+  weatherType: WeatherCondition;
+  lat: number;
+  lng: number;
+  response?: string;
+  forecast?: ForecastDay[];
+};
 
 export default function Home() {
+  const [location, setLocation] = useState({ lat: 28.6139, lng: 77.209 });
+  const [weatherCondition, setWeatherCondition] = useState<WeatherCondition>("clear");
+  const [result, setResult] = useState<WeatherResult | null>(null);
+  const [outlook30Days, setOutlook30Days] = useState<ForecastDay[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isLocating, setIsLocating] = useState(false);
+
+  const [preferences, setPreferences] = useState<Preferences>({
+    defaultLocation: "Delhi",
+    language: "English",
+    occupation: "General Public",
+  });
+
+  const handleSend = useCallback(
+    async (message: string, prefsOverride?: Preferences, customLocation?: string) => {
+      setIsLoading(true);
+      const activePrefs = prefsOverride ?? preferences;
+      const targetLoc = customLocation || activePrefs.defaultLocation || "Delhi";
+
+      try {
+        const res = await fetch("/api/chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            message,
+            occupation: activePrefs.occupation,
+            language: activePrefs.language,
+            location: targetLoc,
+          }),
+        });
+
+        if (!res.ok) throw new Error("Failed to process weather request");
+        const data: WeatherResult = await res.json();
+
+        setResult(data);
+        setWeatherCondition(data.weatherType || "clear");
+        if (data.lat && data.lng) {
+          setLocation({ lat: data.lat, lng: data.lng });
+        }
+
+        // Fetch 30-day extended outlook for the forecast strip toggle
+        try {
+          const outlookRes = await get30DayOutlook(data.lat, data.lng, data.city);
+          if (outlookRes?.days) {
+            const mapped30: ForecastDay[] = outlookRes.days.map((d: any) => {
+              const dt = new Date(d.date);
+              return {
+                date: dt.getDate(),
+                day: ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][dt.getDay()],
+                icon: d.precipitation_probability > 50 ? "🌧️" : "🌤️",
+                highTemp: d.temperature_max,
+                lowTemp: d.temperature_min,
+                rainChance: d.precipitation_probability,
+              };
+            });
+            setOutlook30Days(mapped30);
+          }
+        } catch {}
+      } catch (err: any) {
+        toast.error(err?.message || "Failed to fetch weather update");
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [preferences]
+  );
+
+  // Live GPS Geolocation Trigger (Google Maps style)
+  const handleGPSDetect = useCallback(() => {
+    if (!navigator.geolocation) {
+      toast.error("Geolocation is not supported by your browser");
+      return;
+    }
+
+    setIsLocating(true);
+    const toastId = toast.loading("Detecting your exact GPS location...");
+
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        try {
+          const { latitude, longitude } = pos.coords;
+          const geo = await reverseGeocode(latitude, longitude);
+          const detectedCity = geo.city || "Delhi";
+
+          setLocation({ lat: latitude, lng: longitude });
+          setPreferences((prev) => ({ ...prev, defaultLocation: detectedCity }));
+          toast.success(`📍 Located in ${detectedCity}`, { id: toastId });
+
+          handleSend(`Weather in ${detectedCity}`, undefined, detectedCity);
+        } catch {
+          toast.error("Could not reverse geocode GPS location", { id: toastId });
+        } finally {
+          setIsLocating(false);
+        }
+      },
+      () => {
+        setIsLocating(false);
+        toast.error("Location permission denied", { id: toastId });
+      },
+      { enableHighAccuracy: true, timeout: 10000 }
+    );
+  }, [handleSend]);
+
+  // Initial Load: Preferences & Initial Weather Populating
+  useEffect(() => {
+    fetch("/api/user/preferences")
+      .then((res) => res.json())
+      .then((data: Preferences) => {
+        setPreferences(data);
+        const city = data.defaultLocation || "Delhi";
+        handleSend(`Current weather in ${city}`, data, city);
+      })
+      .catch(() => {
+        handleSend("Current weather in Delhi", undefined, "Delhi");
+      });
+  }, []);
+
+  const handleSavePreferences = async (prefs: Preferences) => {
+    setPreferences(prefs);
+    try {
+      await fetch("/api/user/preferences", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(prefs),
+      });
+      toast.success("Preferences saved successfully!");
+      if (prefs.defaultLocation) {
+        handleSend(`Weather in ${prefs.defaultLocation}`, prefs, prefs.defaultLocation);
+      }
+    } catch {
+      toast.error("Failed to save preferences");
+    }
+  };
+
   return (
-    <ErrorBoundary>
-      <ThemeProvider attribute="class" defaultTheme="dark" enableSystem>
-        <LanguageProvider>
-          <MainDashboard />
-        </LanguageProvider>
-      </ThemeProvider>
-    </ErrorBoundary>
-  )
+    <main className="relative h-screen w-screen overflow-hidden select-none">
+      <Toaster position="top-right" />
+
+      {/* Dynamic Background Gradient & 3D Globe */}
+      <div
+        className={`absolute inset-0 bg-gradient-to-b ${gradients[weatherCondition]} transition-all duration-1000`}
+      >
+        <WeatherGlobe
+          lat={location.lat}
+          lng={location.lng}
+          weatherCondition={weatherCondition}
+        />
+      </div>
+
+      {/* Header */}
+      <Header
+        preferences={preferences}
+        onSavePreferences={handleSavePreferences}
+        activeRole={preferences.occupation}
+        onSelectNavOption={(opt) => {
+          if (opt === "overview") handleSend(`Give me an overview of ${preferences.defaultLocation}`);
+          else if (opt === "forecast") handleSend(`7-day forecast for ${preferences.defaultLocation}`);
+          else if (opt === "advisory") handleSend(`Advisory recommendations for ${preferences.defaultLocation}`);
+          else if (opt === "emergency") handleSend(`Are there any weather alerts for ${preferences.defaultLocation}?`);
+        }}
+      />
+
+      {/* Persistent Weather Summary Card (Top-Left) */}
+      <WeatherSummaryCard
+        city={result?.city ?? preferences.defaultLocation ?? "Delhi"}
+        temp={result?.temp ?? 30}
+        condition={result?.condition ?? "Partly Cloudy"}
+        feelsLike={result?.feelsLike}
+        humidity={result?.humidity}
+        windSpeed={result?.windSpeed}
+        pressure={result?.pressure}
+        onRefreshGPS={handleGPSDetect}
+        isLocating={isLocating}
+      />
+
+      {/* Centered Frosted-Glass Info Strip */}
+      {result && (
+        <InfoStrip
+          city={result.city}
+          temp={result.temp}
+          condition={result.condition}
+          rainChance={result.rainChance}
+        />
+      )}
+
+      {/* Horizontal Frosted-Glass Forecast Strip */}
+      {result?.forecast && result.forecast.length > 0 && (
+        <ForecastStrip days={result.forecast} outlook30Days={outlook30Days} />
+      )}
+
+      {/* Floating Collapsible Chat Input Bar (Bottom-Center) */}
+      <div className="absolute bottom-8 md:bottom-10 left-1/2 -translate-x-1/2 z-20 w-[92%] max-w-2xl">
+        <ChatInputBar
+          onSend={(msg) => handleSend(msg)}
+          isLoading={isLoading}
+          latestResponse={result?.response}
+          role={preferences.occupation}
+        />
+      </div>
+    </main>
+  );
 }

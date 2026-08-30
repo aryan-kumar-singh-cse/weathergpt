@@ -9,6 +9,15 @@ const config: Config = {
   darkMode: 'class',
   theme: {
     extend: {
+      keyframes: {
+        "fade-in": {
+          "0%": { opacity: "0", transform: "translateY(-10px)" },
+          "100%": { opacity: "1", transform: "translateY(0)" },
+        },
+      },
+      animation: {
+        "fade-in": "fade-in 0.4s ease-out",
+      },
       colors: {
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
@@ -35,13 +44,6 @@ const config: Config = {
           DEFAULT: "hsl(var(--accent))",
           foreground: "hsl(var(--accent-foreground))",
         },
-        weather: {
-          sky: "#3b82f6",
-          cloud: "#94a3b8",
-          rain: "#64748b",
-          sun: "#f59e0b",
-          storm: "#ef4444",
-        }
       },
       borderRadius: {
         lg: "var(--radius)",

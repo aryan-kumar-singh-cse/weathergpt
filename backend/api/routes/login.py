@@ -156,3 +156,22 @@ async def update_user_profile(
         logger.error(f"Profile update error: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail="Failed to update profile")
 
+
+@router.get("/user/preferences")
+async def get_user_preferences():
+    """Get current user preferences."""
+    return {
+        "defaultLocation": "Delhi",
+        "language": "English",
+        "occupation": "General Public"
+    }
+
+
+@router.patch("/user/preferences")
+async def update_user_preferences(prefs: dict):
+    """Save user preferences."""
+    return {
+        "success": True,
+        "preferences": prefs
+    }
+
