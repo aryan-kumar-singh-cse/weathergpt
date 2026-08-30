@@ -134,6 +134,7 @@ class AskRequest(BaseModel):
     email: str  # Required for authentication and rate limiting
     language: str = "en"
     role: str = "citizen"
+    location: Optional[str] = None
     location_hint: Optional[Dict[str, Any]] = None
     session_id: Optional[str] = None  # Optional session ID in body
 
@@ -217,7 +218,10 @@ async def ask_weather_question(
         )
 
         # Step 2a: Geocode the place
-        if intent.get("nationwide"):
+        explicit_place = intent.get("place")
+        generic_words = ["india", "here", "current", "today", "now", "nationwide", "this place"]
+
+        if intent.get("nationwide") and not request.location:
             lat, lng = 20.5937, 78.9629
             place_info = {
                 "lat": lat,
@@ -228,13 +232,23 @@ async def ask_weather_question(
                 "source": "default"
             }
         else:
-            place_name = intent.get("place") or user.location or "Delhi"
+            if explicit_place and explicit_place.lower() not in generic_words:
+                place_name = explicit_place
+            else:
+                place_name = (
+                    request.location
+                    or (request.location_hint.get("place_name") if request.location_hint else None)
+                    or user.location
+                    or "Delhi"
+                )
+
             try:
                 place_info = await geocoding_service.geocode(place_name)
                 lat, lng = place_info["lat"], place_info["lng"]
             except GeocodingError as e:
-                logger.error(f"Geocoding failed: {e}")
-                raise HTTPException(status_code=404, detail=f"Location '{place_name}' not found")
+                logger.error(f"Geocoding failed for {place_name}: {e}, falling back to Delhi")
+                place_info = await geocoding_service.geocode("Delhi")
+                lat, lng = place_info["lat"], place_info["lng"]
 
         # Step 2b: Fetch weather data based on intent
         if intent.get("intent") == "historical":

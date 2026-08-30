@@ -80,12 +80,14 @@ class LLMService:
 
         # Try Tier A (Primary - Groq)
         if primary_key and not primary_key.startswith("your-"):
-            groq_models = [self.primary_model, "llama-3.3-70b-versatile", "llama-3.1-70b-versatile", "llama-3.1-8b-instant", "mixtral-8x7b-32768"]
+            groq_models = [self.primary_model, "openai/gpt-oss-120b", "openai/gpt-oss-20b", "qwen/qwen3.6-27b", "qwen/qwen3.8-27b"]
             primary_client = AsyncOpenAI(
                 base_url=self.primary_base_url,
                 api_key=primary_key
             )
             for m_name in dict.fromkeys(groq_models):
+                if not m_name:
+                    continue
                 try:
                     logger.info(f"🔄 Attempting PRIMARY tier (Groq: {m_name})...")
                     response = await self._call_with_timeout(
@@ -108,12 +110,14 @@ class LLMService:
 
         # Try Tier B (Secondary - Gemini)
         if secondary_key and not secondary_key.startswith("your-"):
-            gemini_models = [self.secondary_model, "gemini-1.5-flash", "gemini-2.5-flash", "gemini-2.0-flash"]
+            gemini_models = [self.secondary_model, "gemini-3.6-flash", "gemini-3.7-flash", "gemini-flash-latest", "gemini-2.5-flash"]
             secondary_client = AsyncOpenAI(
                 base_url=self.secondary_base_url,
                 api_key=secondary_key
             )
             for g_model in dict.fromkeys(gemini_models):
+                if not g_model:
+                    continue
                 try:
                     logger.info(f"🔄 Attempting SECONDARY tier (Gemini: {g_model})...")
                     response = await self._call_with_timeout(

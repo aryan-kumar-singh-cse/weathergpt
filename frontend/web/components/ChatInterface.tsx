@@ -126,7 +126,7 @@ export default function ChatInterface({ location, role, language, email, onAuthE
     setRateLimitWarning(null)
 
     try {
-      const result: AskResponse = await askWeatherQuestion(userMsg, email, language, role)
+      const result: AskResponse = await askWeatherQuestion(userMsg, email, language, role, location)
 
       setMessages((prev) => [
         ...prev,
@@ -175,7 +175,7 @@ export default function ChatInterface({ location, role, language, email, onAuthE
     } finally {
       setIsTyping(false)
     }
-  }, [input, isTyping, email, language, role, onAuthError, t])
+  }, [input, isTyping, email, language, role, location, onAuthError, t])
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {

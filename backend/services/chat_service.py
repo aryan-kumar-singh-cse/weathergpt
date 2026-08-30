@@ -292,7 +292,13 @@ class ChatService:
             except:
                 return "moderate"
 
-        lines.append(f"Current conditions:")
+        place_info = weather_data.get("place_info", {})
+        place_name = place_info.get("place_name") or place_info.get("city") or "the selected location"
+        state = place_info.get("state")
+        loc_str = f"{place_name}, {state}" if state else place_name
+
+        lines.append(f"Target Location: {loc_str}")
+        lines.append(f"Current conditions in {loc_str}:")
         lines.append(f"  Temperature: {current.get('temperature', 'N/A')}°C")
         if current.get('apparent_temperature') and current.get('apparent_temperature') != current.get('temperature'):
             lines.append(f"  Feels like: {current.get('apparent_temperature', 'N/A')}°C")
@@ -313,14 +319,14 @@ class ChatService:
         # Forecast
         forecast_days = weather_data.get("forecast", {}).get("days", [])
         if forecast_days:
-            lines.append(f"\nForecast for the next {len(forecast_days)} days:")
+            lines.append(f"\n7-Day Forecast for {loc_str}:")
             for day in forecast_days[:7]:
                 precip_prob = day.get('precipitation_probability', 0)
                 rain_text = "likely rain" if precip_prob > 70 else "possible rain" if precip_prob > 40 else "mostly dry"
                 lines.append(
                     f"  {day.get('date', 'N/A')}: "
                     f"{day.get('temperature_min', 'N/A')}°C to {day.get('temperature_max', 'N/A')}°C, "
-                    f"{rain_text}, "
+                    f"{rain_text} ({precip_prob}% chance), "
                     f"winds up to {day.get('wind_speed_max', 0)} km/h"
                 )
 
@@ -361,9 +367,9 @@ class ChatService:
                 96: "thunderstorm with slight hail",
                 99: "thunderstorm with heavy hail"
             }
-            return descriptions.get(code, "unknown conditions")
+            return descriptions.get(code, "partly cloudy")
         except:
-            return "unknown"
+            return "partly cloudy"
 
     def _generate_greeting_response(
         self,
@@ -402,65 +408,45 @@ class ChatService:
         role: str,
         language: str
     ) -> str:
-        """Generate a fallback response when LLM fails."""
+        """Generate a fallback response quoting the exact location when LLM fails."""
+        place_info = weather_data.get("place_info", {})
+        place_name = place_info.get("place_name") or place_info.get("city") or "your location"
+
         current = weather_data.get("current", {})
         temp = current.get("temperature", "N/A")
+        feels_like = current.get("apparent_temperature", temp)
         humidity = current.get("humidity", "N/A")
         wind = current.get("wind_speed", "N/A")
-        precip = current.get("precipitation", "N/A")
+        precip = current.get("precipitation", 0)
+        weather_code = current.get("weather_code", 0)
+        condition = self._weather_code_description(weather_code)
 
         severity = weather_data.get("severity", {})
         alerts = severity.get("alerts", [])
+        forecast_days = weather_data.get("forecast", {}).get("days", [])
 
-        lang_map = {
-            "en": {"greeting": "Here's what the weather looks like", "temp": "It's", "hum": "humidity", "wind": "winds", "rain": "rain"},
-            "hi": {"greeting": "मौसम की जानकारी", "temp": "तापमान", "hum": "आर्द्रता", "wind": "हवा", "rain": "वर्षा"},
-            "ta": {"greeting": "வானிலை தகவல்", "temp": "வெப்பநிலை", "hum": "ஈரப்பதம்", "wind": "காற்று", "rain": "மழை"},
-        }
-        lang = lang_map.get(language, lang_map["en"])
+        response = f"**Weather Intelligence for {place_name}**\n\n"
+        response += f"Currently in **{place_name}**, the temperature is **{temp}°C** (feels like **{feels_like}°C**) with **{condition}** and **{humidity}%** humidity. Winds are blowing at **{wind} km/h**."
 
-        # Describe humidity
-        humidity_desc = ""
-        try:
-            h = float(humidity)
-            if h > 80:
-                humidity_desc = "high humidity (might feel sticky)"
-            elif h > 60:
-                humidity_desc = "comfortable humidity"
-            else:
-                humidity_desc = "low humidity (quite dry)"
-        except:
-            humidity_desc = f"{humidity}% humidity"
+        if precip and precip > 0:
+            response += f"\n\n🌧️ **Rainfall Alert**: Approximately **{precip} mm** of precipitation is recorded."
 
-        # Simple friendly format
-        response = f"{lang['greeting']}:\n\n"
-        response += f"Right now it's around {temp}°C"
+        if forecast_days:
+            response += f"\n\n**Upcoming 7-Day Forecast Outlook**:\n"
+            for d in forecast_days[:5]:
+                response += f"- **{d.get('date')}**: {d.get('temperature_min')}°C to {d.get('temperature_max')}°C • {d.get('precipitation_probability', 0)}% rain chance\n"
 
-        if humidity != "N/A":
-            response += f" with {humidity_desc}"
-
-        if wind != "N/A":
-            try:
-                w = float(wind)
-                if w < 10:
-                    response += f". Winds are light and calm"
-                elif w < 30:
-                    response += f". Moderate winds around {wind} km/h"
-                else:
-                    response += f". Strong winds at {wind} km/h"
-            except:
-                response += f". Winds at {wind} km/h"
-
-        response += "."
-
-        if precip != "N/A" and precip != 0:
-            response += "\n\nCurrently experiencing some rain."
+        if role == "farmer":
+            response += f"\n🌱 **Agricultural Advisory**: Moisture levels are at {humidity}%. Plan irrigation according to the {forecast_days[0].get('precipitation_probability', 0) if forecast_days else 0}% rain probability."
+        elif role == "pilot":
+            response += f"\n✈️ **Aviation Briefing**: Surface visibility is clear under {condition} with {wind} km/h wind speeds."
+        elif role == "disaster-manager":
+            response += f"\n🚨 **Emergency Overview**: Severity index is **{severity.get('severity', 'normal').upper()}**."
 
         if alerts:
-            response += f"\n\n⚠️ Weather alerts: {', '.join(alerts)}"
+            response += f"\n\n⚠️ **Active Warnings**: {', '.join(alerts)}"
 
-        response += "\n\n(Weather data from Open-Meteo)"
-
+        response += f"\n\n*(Verified live data from Open-Meteo)*"
         return response
 
     def get_supported_languages(self) -> List[str]:

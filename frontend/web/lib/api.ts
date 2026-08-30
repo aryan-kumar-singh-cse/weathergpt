@@ -94,7 +94,8 @@ export async function askWeatherQuestion(
   query: string,
   email: string,
   language: string = 'en',
-  role: string = 'citizen'
+  role: string = 'citizen',
+  location?: string
 ): Promise<AskResponse> {
   const response = await fetch(`${API_BASE}/ask`, {
     method: 'POST',
@@ -106,6 +107,7 @@ export async function askWeatherQuestion(
       email,
       language,
       role,
+      location: location || undefined,
     }),
   })
 
