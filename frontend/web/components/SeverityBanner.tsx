@@ -15,6 +15,12 @@ const severityConfig = {
     show: false,
     ariaLevel: "polite" as const
   },
+  watch: {
+    label: "Weather Watch",
+    icon: Info,
+    show: true,
+    ariaLevel: "polite" as const
+  },
   warning: {
     label: "Weather Warning",
     icon: AlertTriangle,

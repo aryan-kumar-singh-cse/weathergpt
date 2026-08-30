@@ -68,7 +68,8 @@ export default function EnhancedChatInterface({
     setError(null)
 
     try {
-      const result: AskResponse = await askWeatherQuestion(userMsg, language, role)
+      const userEmail = email || (typeof window !== "undefined" ? localStorage.getItem("weathergpt_email") : "") || "user@weathergpt.local"
+      const result: AskResponse = await askWeatherQuestion(userMsg, userEmail, language, role)
 
       // Update rate limit info if available
       if (result.rate_limit) {

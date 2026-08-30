@@ -5,39 +5,90 @@
 
 import {
   AskResponse,
-  WeatherData,
   LoginResponse,
   LoginStatusResponse,
-  ApiCapabilities,
-  ExampleQuery,
+  Outlook30Data,
+  ForecastData,
 } from './types'
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1'
 
 /**
- * Login or create user
+ * Login or register user
  */
-export async function login(email: string, occupation: string): Promise<LoginResponse> {
+export async function login(
+  email: string,
+  occupation: string,
+  name?: string,
+  location?: string,
+  preferred_language?: string
+): Promise<LoginResponse> {
   const response = await fetch(`${API_BASE}/login`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ email, occupation }),
-  });
+    body: JSON.stringify({
+      email,
+      name: name || undefined,
+      occupation,
+      location: location || 'Delhi',
+      preferred_language: preferred_language || 'en',
+    }),
+  })
 
   if (!response.ok) {
-    const error = await response.json().catch(() => ({ detail: 'Login failed' }));
-    throw new Error(error.detail || 'Login failed');
+    const error = await response.json().catch(() => ({ detail: 'Login failed' }))
+    throw new Error(error.detail || 'Login failed')
   }
 
-  return response.json();
+  return response.json()
 }
 
 /**
- * Main conversational endpoint - ask a weather question
- * Requires email for authentication and rate limiting
- * Retrieves API keys from localStorage and sends them to backend
+ * Get user login status & profile
+ */
+export async function getUserStatus(email: string): Promise<LoginStatusResponse> {
+  const response = await fetch(`${API_BASE}/login/status?email=${encodeURIComponent(email.trim().toLowerCase())}`)
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ detail: 'User not found' }))
+    throw new Error(error.detail || 'User not found')
+  }
+
+  return response.json()
+}
+
+/**
+ * Update user location or language preference
+ */
+export async function updateUserProfile(
+  email: string,
+  location?: string,
+  preferred_language?: string
+): Promise<{ success: boolean; email: string; location?: string; preferred_language?: string }> {
+  const response = await fetch(`${API_BASE}/user/profile`, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      email,
+      location: location || undefined,
+      preferred_language: preferred_language || undefined,
+    }),
+  })
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ detail: 'Failed to update profile' }))
+    throw new Error(error.detail || 'Failed to update profile')
+  }
+
+  return response.json()
+}
+
+/**
+ * Main conversational endpoint - ask a weather question using shared team API keys
  */
 export async function askWeatherQuestion(
   query: string,
@@ -45,10 +96,6 @@ export async function askWeatherQuestion(
   language: string = 'en',
   role: string = 'citizen'
 ): Promise<AskResponse> {
-  // Retrieve API keys from localStorage
-  const groqApiKey = localStorage.getItem('weathergpt_groq_key') || undefined;
-  const geminiApiKey = localStorage.getItem('weathergpt_gemini_key') || undefined;
-
   const response = await fetch(`${API_BASE}/ask`, {
     method: 'POST',
     headers: {
@@ -59,69 +106,72 @@ export async function askWeatherQuestion(
       email,
       language,
       role,
-      groq_api_key: groqApiKey,
-      gemini_api_key: geminiApiKey
     }),
-  });
+  })
 
   if (!response.ok) {
-    const error = await response.json().catch(() => ({ detail: 'Request failed' }));
-    throw new Error(error.detail || 'Failed to fetch weather data');
+    const error = await response.json().catch(() => ({ detail: 'Request failed' }))
+    throw new Error(error.detail || 'Failed to fetch weather response')
   }
 
-  return response.json();
-}
-
-/**
- * Get current weather for coordinates
- */
-export async function getCurrentWeather(
-  lat: number,
-  lng: number
-): Promise<WeatherData> {
-  const response = await fetch(
-    `${API_BASE}/weather/current?lat=${lat}&lng=${lng}`
-  );
-
-  if (!response.ok) {
-    throw new Error('Failed to fetch current weather');
-  }
-
-  return response.json();
+  return response.json()
 }
 
 /**
  * Get current weather for city
  */
-export async function getCurrentWeatherByCity(city: string): Promise<WeatherData> {
+export async function getCurrentWeatherByCity(city: string): Promise<any> {
   const response = await fetch(
     `${API_BASE}/weather/current?city=${encodeURIComponent(city)}`
-  );
+  )
 
   if (!response.ok) {
-    throw new Error(`Failed to fetch weather for ${city}`);
+    throw new Error(`Failed to fetch weather for ${city}`)
   }
 
-  return response.json();
+  return response.json()
 }
 
 /**
- * Get 7-day forecast
+ * Get 7-day daily forecast
  */
 export async function getDailyForecast(
   lat: number,
   lng: number,
   days: number = 7
-): Promise<WeatherData> {
+): Promise<ForecastData> {
   const response = await fetch(
     `${API_BASE}/weather/forecast/daily?lat=${lat}&lng=${lng}&days=${days}`
-  );
+  )
 
   if (!response.ok) {
-    throw new Error('Failed to fetch forecast');
+    throw new Error('Failed to fetch forecast')
   }
 
-  return response.json();
+  return response.json()
+}
+
+/**
+ * Get 30-day extended outlook with disclaimer
+ */
+export async function get30DayOutlook(
+  lat?: number,
+  lng?: number,
+  city?: string
+): Promise<Outlook30Data> {
+  let url = `${API_BASE}/weather/forecast/outlook30`
+  if (city) {
+    url += `?city=${encodeURIComponent(city)}`
+  } else if (lat !== undefined && lng !== undefined) {
+    url += `?lat=${lat}&lng=${lng}`
+  }
+
+  const response = await fetch(url)
+  if (!response.ok) {
+    throw new Error('Failed to fetch 30-day outlook')
+  }
+
+  return response.json()
 }
 
 /**
@@ -133,65 +183,12 @@ export async function getWeatherAlerts(
 ): Promise<{ alerts: any[] }> {
   const response = await fetch(
     `${API_BASE}/weather/alerts?lat=${lat}&lng=${lng}`
-  );
+  )
 
   if (!response.ok) {
-    throw new Error('Failed to fetch alerts');
+    throw new Error('Failed to fetch alerts')
   }
 
-  return response.json();
+  return response.json()
 }
 
-/**
- * Geocode a city name
- */
-export async function geocodeCity(city: string): Promise<{ lat: number; lng: number; city: string }> {
-  const response = await fetch(
-    `${API_BASE}/weather/geocode?city=${encodeURIComponent(city)}`
-  );
-
-  if (!response.ok) {
-    throw new Error(`Failed to geocode ${city}`);
-  }
-
-  return response.json();
-}
-
-/**
- * Get API capabilities
- */
-export async function getCapabilities(): Promise<ApiCapabilities> {
-  const response = await fetch(`${API_BASE}/ask/capabilities`);
-
-  if (!response.ok) {
-    throw new Error('Failed to fetch capabilities');
-  }
-
-  return response.json();
-}
-
-/**
- * Get example queries
- */
-export async function getExampleQueries(): Promise<{ examples: ExampleQuery[] }> {
-  const response = await fetch(`${API_BASE}/ask/examples`);
-
-  if (!response.ok) {
-    throw new Error('Failed to fetch examples');
-  }
-
-  return response.json();
-}
-
-/**
- * Get service status
- */
-export async function getServiceStatus(): Promise<{ status: string; version: string; uptime: number }> {
-  const response = await fetch(`${API_BASE}/status`);
-
-  if (!response.ok) {
-    throw new Error('Failed to fetch service status');
-  }
-
-  return response.json();
-}

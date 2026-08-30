@@ -153,19 +153,18 @@ class AuthUser(Base):
     __tablename__ = "auth_users"
 
     email = Column(String(255), primary_key=True, index=True)
+    name = Column(String(255), nullable=True)
     occupation = Column(String(255), nullable=False)
+    location = Column(String(255), nullable=True, default="Delhi")
+    preferred_language = Column(String(10), nullable=True, default="en")
     created_at = Column(DateTime, default=datetime.utcnow)
     last_login = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-
-    # User's own API keys (encrypted)
-    groq_api_key = Column(String(512), nullable=True)  # Encrypted
-    gemini_api_key = Column(String(512), nullable=True)  # Encrypted
 
     # Relationships
     usage_logs = relationship("UsageLog", back_populates="user", cascade="all, delete-orphan")
 
     def __repr__(self):
-        return f"<AuthUser(email={self.email}, occupation={self.occupation})>"
+        return f"<AuthUser(email={self.email}, name={self.name}, occupation={self.occupation})>"
 
 
 class UsageLog(Base):

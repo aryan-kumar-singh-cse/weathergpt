@@ -1,15 +1,14 @@
 /**
  * WeatherGPT TypeScript Type Definitions
- * Replaces `any` types with proper interfaces
  */
 
-// Weather Code Mapping (WMO Weather interpretation codes)
 export type WeatherCode = 0 | 1 | 2 | 3 | 45 | 48 | 51 | 53 | 55 | 56 | 57 | 61 | 63 | 65 | 66 | 67 | 71 | 73 | 75 | 77 | 80 | 81 | 82 | 85 | 86 | 95 | 96 | 99
 
 export interface LocationData {
   lat: number
   lng: number
   city?: string
+  state?: string
   timezone?: string
 }
 
@@ -27,43 +26,33 @@ export interface CurrentWeatherData {
 
 export interface ForecastDay {
   date: string
+  day_number?: number
   temperature_max: number
   temperature_min: number
   precipitation_sum: number
   precipitation_probability: number
   wind_speed_max: number
   weather_code: WeatherCode
+  confidence?: string
 }
 
 export interface ForecastData {
   daily: ForecastDay[]
 }
 
-export interface WeatherData {
+export interface Outlook30Data {
   location: LocationData
-  current: CurrentWeatherData
-  forecast?: ForecastData
-  data_source: string
+  outlook_days: number
+  days: ForecastDay[]
+  disclaimer: string
+  data_source?: string
   timestamp: string
-  severity?: SeverityData
 }
 
 export interface SeverityData {
-  severity: 'normal' | 'warning' | 'severe' | 'extreme'
+  severity: 'normal' | 'watch' | 'warning' | 'severe' | 'extreme'
   alerts: string[]
   alert_count: number
-}
-
-export interface AlertData {
-  id: string
-  type: string
-  severity: 'minor' | 'moderate' | 'severe' | 'extreme'
-  title: string
-  description: string
-  area: string
-  effective: string
-  expires: string
-  source?: string
 }
 
 export interface IntentData {
@@ -72,12 +61,6 @@ export interface IntentData {
   intent: string
   nationwide: boolean
   confidence: number
-}
-
-export interface RateLimitInfo {
-  remaining: number
-  limit: number
-  reset_at: string
 }
 
 export interface AskResponse {
@@ -97,57 +80,41 @@ export interface AskResponse {
   grounding_source: string
   llm_tier_used: string | null
   timestamp: string
-  rate_limit?: RateLimitInfo
+  rate_limit?: {
+    remaining: number
+    limit: number
+    reset_at?: string
+  }
+}
+
+export interface UserProfile {
+  email: string
+  name?: string
+  occupation: string
+  location?: string
+  preferred_language?: string
+  created_at?: string
+  last_login?: string
 }
 
 export interface LoginResponse {
+  email: string
+  name?: string
+  occupation: string
+  location?: string
+  preferred_language?: string
   message: string
-  user: {
-    email: string
-    occupation: string
-    created_at: string
-  }
+  is_new_user: boolean
 }
 
 export interface LoginStatusResponse {
-  email: string
-  occupation: string
   exists: boolean
+  email: string
+  name?: string
+  occupation: string
+  location?: string
+  preferred_language?: string
 }
 
-export interface ApiError {
-  detail: string | ErrorDetail[]
-}
-
-export interface ErrorDetail {
-  loc: string[]
-  msg: string
-  type: string
-}
-
-// Authentication states
 export type AuthState = 'checking' | 'authenticated' | 'unauthenticated'
 
-// User data
-export interface UserData {
-  email: string
-  occupation: string
-}
-
-// API Capabilities
-export interface ApiCapabilities {
-  languages: string[]
-  roles: string[]
-  max_forecast_days: number
-  rate_limits: {
-    requests_per_day: number
-    requests_per_hour: number
-  }
-}
-
-// Example query structure
-export interface ExampleQuery {
-  query: string
-  language: string
-  description: string
-}

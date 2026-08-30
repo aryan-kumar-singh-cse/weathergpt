@@ -1,75 +1,231 @@
 "use client"
 
-import { useState } from "react"
-import { MapPin, ChevronDown } from "lucide-react"
+import React, { useState, useEffect, useRef } from "react"
+import { MapPin, ChevronDown, ChevronRight, ArrowLeft, Search, Check } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover"
-
-interface Location {
-  name: string
-  state: string
-  lat: number
-  lng: number
-}
+import { INDIA_LOCATIONS, StateInfo, CityInfo } from "@/lib/india-locations"
+import { useTranslation } from "@/lib/i18n"
 
 interface LocationSelectorProps {
-  locations: Location[]
   selectedLocation: string
-  onSelect: (location: string) => void
+  onSelect: (location: string, stateName?: string, lat?: number, lng?: number) => void
 }
 
 export default function LocationSelector({
-  locations,
   selectedLocation,
   onSelect,
 }: LocationSelectorProps) {
+  const { t } = useTranslation()
   const [isOpen, setIsOpen] = useState(false)
+  const [selectedState, setSelectedState] = useState<StateInfo | null>(null)
+  const [searchQuery, setSearchQuery] = useState("")
+  const inputRef = useRef<HTMLInputElement>(null)
+  const containerRef = useRef<HTMLDivElement>(null)
+
+  // Reset internal state whenever opened or closed
+  const toggleOpen = () => {
+    if (!isOpen) {
+      setSelectedState(null)
+      setSearchQuery("")
+      setIsOpen(true)
+    } else {
+      setIsOpen(false)
+      setSelectedState(null)
+      setSearchQuery("")
+    }
+  }
+
+  // Handle outside click to close popover without layout shift
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+        setIsOpen(false)
+        setSelectedState(null)
+        setSearchQuery("")
+      }
+    }
+    if (isOpen) {
+      document.addEventListener("mousedown", handleClickOutside)
+    }
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside)
+    }
+  }, [isOpen])
+
+  // Focus search input on step change
+  useEffect(() => {
+    if (isOpen && inputRef.current) {
+      inputRef.current.focus()
+    }
+  }, [isOpen, selectedState])
+
+  // Filter states or cities based on query
+  const filteredStates = INDIA_LOCATIONS.filter(
+    (s) =>
+      s.state.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (s.state_local && s.state_local.toLowerCase().includes(searchQuery.toLowerCase()))
+  )
+
+  const filteredCities = selectedState
+    ? selectedState.cities.filter(
+        (c) =>
+          c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          (c.name_local && c.name_local.toLowerCase().includes(searchQuery.toLowerCase()))
+      )
+    : []
+
+  const handleStateClick = (state: StateInfo, e: React.MouseEvent) => {
+    e.stopPropagation()
+    setSelectedState(state)
+    setSearchQuery("")
+  }
+
+  const handleCityClick = (city: CityInfo, e: React.MouseEvent) => {
+    e.stopPropagation()
+    onSelect(city.name, selectedState?.state, city.lat, city.lng)
+    setIsOpen(false)
+    setSelectedState(null)
+    setSearchQuery("")
+  }
+
+  const handleBackToStates = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    setSelectedState(null)
+    setSearchQuery("")
+  }
 
   return (
-    <Popover open={isOpen} onOpenChange={setIsOpen}>
-      <PopoverTrigger asChild>
-        <Button
-          variant="outline"
-          className="w-full justify-between bg-white dark:bg-gray-900 border-gray-200 dark:border-yellow-500/20 hover:bg-yellow-50 dark:hover:bg-yellow-900/10"
-        >
-          <div className="flex items-center gap-2">
-            <MapPin className="w-4 h-4 text-yellow-500" />
-            <span className="text-sm text-gray-900 dark:text-white">
-              {selectedLocation || "Select Location"}
-            </span>
-          </div>
-          <ChevronDown className="w-4 h-4 text-gray-500 dark:text-gray-400" />
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent className="w-[300px] p-0 bg-white dark:bg-gray-900 border border-gray-200 dark:border-yellow-500/20" align="start">
-        <div className="max-h-[300px] overflow-y-auto">
-          {locations.map((location) => (
-            <button
-              key={location.name}
-              onClick={() => {
-                onSelect(location.name)
-                setIsOpen(false)
-              }}
-              className={`w-full px-4 py-3 text-left hover:bg-yellow-50 dark:hover:bg-yellow-900/10 transition-colors ${
-                selectedLocation === location.name
-                  ? 'bg-yellow-100 dark:bg-yellow-900/20'
-                  : ''
-              }`}
-            >
-              <div className="font-medium text-gray-900 dark:text-white">
-                {location.name}
-              </div>
-              <div className="text-sm text-gray-600 dark:text-gray-400">
-                {location.state}
-              </div>
-            </button>
-          ))}
+    <div className="relative w-full" ref={containerRef}>
+      {/* Trigger Button */}
+      <Button
+        type="button"
+        variant="outline"
+        onClick={toggleOpen}
+        className="w-full justify-between bg-white dark:bg-gray-900 border-gray-200 dark:border-yellow-500/20 hover:bg-yellow-50 dark:hover:bg-yellow-900/10 h-11 px-4 rounded-2xl shadow-sm transition-all"
+        aria-haspopup="dialog"
+        aria-expanded={isOpen}
+      >
+        <div className="flex items-center gap-2.5 overflow-hidden text-ellipsis whitespace-nowrap">
+          <MapPin className="w-4 h-4 text-yellow-500 shrink-0" />
+          <span className="text-sm font-semibold text-gray-900 dark:text-white truncate">
+            {selectedLocation || t("select_location")}
+          </span>
         </div>
-      </PopoverContent>
-    </Popover>
+        <ChevronDown className={`w-4 h-4 text-gray-500 transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`} />
+      </Button>
+
+      {/* Floating Overlay Popover - Absolute positioning with high z-index */}
+      {isOpen && (
+        <div
+          className="absolute top-full left-0 mt-2 w-full min-w-[320px] max-w-[380px] bg-white dark:bg-gray-900 rounded-2xl shadow-2xl border border-gray-200 dark:border-yellow-500/30 z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-150"
+          style={{ willChange: "transform, opacity" }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          {/* Header & Search Bar */}
+          <div className="p-3 border-b border-gray-100 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-900/50 space-y-2">
+            {selectedState ? (
+              <div className="flex items-center justify-between">
+                <button
+                  type="button"
+                  onClick={handleBackToStates}
+                  className="flex items-center gap-1.5 text-xs font-bold text-yellow-600 dark:text-yellow-400 hover:underline px-1 py-0.5 rounded focus:outline-none"
+                >
+                  <ArrowLeft className="w-3.5 h-3.5" />
+                  {t("back_to_states")}
+                </button>
+                <span className="text-xs font-semibold text-gray-500 dark:text-gray-400">
+                  {selectedState.state}
+                </span>
+              </div>
+            ) : (
+              <div className="text-xs font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider px-1">
+                Select Indian State
+              </div>
+            )}
+
+            {/* Search Input with event propagation stoppage */}
+            <div className="relative">
+              <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+              <input
+                ref={inputRef}
+                type="text"
+                value={searchQuery}
+                onChange={(e) => {
+                  e.stopPropagation()
+                  setSearchQuery(e.target.value)
+                }}
+                onKeyDown={(e) => e.stopPropagation()}
+                onClick={(e) => e.stopPropagation()}
+                onMouseDown={(e) => e.stopPropagation()}
+                placeholder={selectedState ? t("search_city") : t("search_state")}
+                className="w-full pl-9 pr-4 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-xs text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-yellow-400"
+              />
+            </div>
+          </div>
+
+          {/* List Area */}
+          <div className="max-h-[260px] overflow-y-auto p-1.5 scrollbar-thin scrollbar-thumb-yellow-400 dark:scrollbar-thumb-yellow-500">
+            {!selectedState ? (
+              // Step 1: States List
+              filteredStates.length > 0 ? (
+                filteredStates.map((state) => (
+                  <button
+                    key={state.state}
+                    type="button"
+                    onClick={(e) => handleStateClick(state, e)}
+                    className="w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-left hover:bg-yellow-50 dark:hover:bg-yellow-900/20 text-gray-900 dark:text-gray-100 transition-colors group"
+                  >
+                    <div>
+                      <div className="font-semibold text-xs text-gray-900 dark:text-white group-hover:text-yellow-600 dark:group-hover:text-yellow-400">
+                        {state.state}
+                      </div>
+                      {state.state_local && (
+                        <div className="text-[10px] text-gray-500 dark:text-gray-400">
+                          {state.state_local} • {state.cities.length} cities
+                        </div>
+                      )}
+                    </div>
+                    <ChevronRight className="w-4 h-4 text-gray-400 group-hover:text-yellow-500 group-hover:translate-x-0.5 transition-all" />
+                  </button>
+                ))
+              ) : (
+                <div className="p-6 text-center text-xs text-gray-500">No states matching "{searchQuery}"</div>
+              )
+            ) : (
+              // Step 2: Cities List
+              filteredCities.length > 0 ? (
+                filteredCities.map((city) => {
+                  const isSelected = selectedLocation.toLowerCase() === city.name.toLowerCase()
+                  return (
+                    <button
+                      key={city.name}
+                      type="button"
+                      onClick={(e) => handleCityClick(city, e)}
+                      className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-left transition-colors ${
+                        isSelected
+                          ? "bg-yellow-100 dark:bg-yellow-900/30 text-yellow-900 dark:text-yellow-200 font-bold"
+                          : "hover:bg-yellow-50 dark:hover:bg-yellow-900/20 text-gray-900 dark:text-gray-100"
+                      }`}
+                    >
+                      <div>
+                        <div className="font-semibold text-xs">{city.name}</div>
+                        {city.name_local && (
+                          <div className="text-[10px] text-gray-500 dark:text-gray-400">
+                            {city.name_local} {city.district ? `• ${city.district}` : ""}
+                          </div>
+                        )}
+                      </div>
+                      {isSelected && <Check className="w-4 h-4 text-yellow-600 dark:text-yellow-400" />}
+                    </button>
+                  )
+                })
+              ) : (
+                <div className="p-6 text-center text-xs text-gray-500">No cities matching "{searchQuery}"</div>
+              )
+            )}
+          </div>
+        </div>
+      )}
+    </div>
   )
 }

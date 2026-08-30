@@ -20,7 +20,6 @@ from backend.services import (
 from backend.services.climate_service import climate_service
 from backend.services.conversation_service import conversation_service
 from backend.services.auth_service import auth_service
-from backend.services.encryption_service import encryption_service
 from backend.models.db_config import get_db_dependency
 
 logger = logging.getLogger(__name__)
@@ -137,8 +136,6 @@ class AskRequest(BaseModel):
     role: str = "citizen"
     location_hint: Optional[Dict[str, Any]] = None
     session_id: Optional[str] = None  # Optional session ID in body
-    groq_api_key: Optional[str] = None  # User's Groq API key (from localStorage)
-    gemini_api_key: Optional[str] = None  # User's Gemini API key (from localStorage)
 
 
 class AskResponse(BaseModel):
@@ -162,33 +159,9 @@ async def ask_weather_question(
     db: Session = Depends(get_db_dependency)
 ):
     """
-    Process a natural language weather query.
-
-    This is the main conversational endpoint implementing the three-layer pipeline:
-    1. Intent + Entity Extraction (LLM call #1)
-    2. Retrieval (geocode + fetch Open-Meteo data + classify severity)
-    3. Grounded Response Generation (LLM call #2)
-
-    Args:
-        request: AskRequest with query, language, role
-        session_id: User session ID (from X-Session-ID header or request body)
-        db: Database session
-
-    Returns:
-        AskResponse with weather data, severity, and natural language response
-
-    Example:
-        POST /api/v1/ask
-        Headers: X-Session-ID: <session-id>
-        {
-            "query": "Will it rain in Mumbai tomorrow?",
-            "language": "en",
-            "role": "farmer"
-        }
+    Process a natural language weather query with shared team LLM keys and role awareness.
     """
     start_time = datetime.utcnow()
-
-    # Use session_id from header or request body (header takes precedence)
     effective_session_id = session_id or request.session_id or f"anon-{datetime.utcnow().timestamp()}"
 
     if not request.query or not request.query.strip():
@@ -205,7 +178,7 @@ async def ask_weather_question(
             detail="User not found. Please login with your email and occupation first."
         )
 
-    # Check rate limit
+    # Check rate limit (20 requests per rolling 24h window)
     is_allowed, requests_made, requests_remaining = auth_service.check_rate_limit(
         email=request.email,
         endpoint="/api/v1/ask",
@@ -236,47 +209,15 @@ async def ask_weather_question(
         request.language = "en"
 
     try:
-        # Get API keys - prioritize keys from request (localStorage), fallback to DB
-        logger.info(f"🔐 Resolving API keys for user: {request.email}")
-        logger.info(f"   Keys in request body: Groq={bool(request.groq_api_key)}, Gemini={bool(request.gemini_api_key)}")
-        logger.info(f"   Keys in DB: Groq={bool(user.groq_api_key)}, Gemini={bool(user.gemini_api_key)}")
-
-        user_groq_key = None
-        user_gemini_key = None
-
-        # Use keys from request if provided (from localStorage), otherwise decrypt from DB
-        if request.groq_api_key:
-            user_groq_key = request.groq_api_key
-            logger.info(f"✅ Using Groq API key from request (localStorage)")
-        elif user.groq_api_key:
-            try:
-                user_groq_key = encryption_service.decrypt(user.groq_api_key)
-                logger.info(f"✅ Decrypted Groq API key from DB for {request.email}")
-            except Exception as e:
-                logger.error(f"❌ Failed to decrypt Groq API key for {request.email}: {type(e).__name__}: {e}")
-
-        if request.gemini_api_key:
-            user_gemini_key = request.gemini_api_key
-            logger.info(f"✅ Using Gemini API key from request (localStorage)")
-        elif user.gemini_api_key:
-            try:
-                user_gemini_key = encryption_service.decrypt(user.gemini_api_key)
-                logger.info(f"✅ Decrypted Gemini API key from DB for {request.email}")
-            except Exception as e:
-                logger.error(f"❌ Failed to decrypt Gemini API key for {request.email}: {type(e).__name__}: {e}")
-
         # Step 1: Extract intent + entities (LLM call #1)
         logger.info(f"Processing query: '{request.query}' (role={request.role}, lang={request.language})")
         intent = await chat_service.extract_intent(
             request.query,
-            request.language,
-            user_groq_key=user_groq_key,
-            user_gemini_key=user_gemini_key
+            request.language
         )
 
         # Step 2a: Geocode the place
         if intent.get("nationwide"):
-            # For nationwide queries, use India's center coordinates
             lat, lng = 20.5937, 78.9629
             place_info = {
                 "lat": lat,
@@ -287,7 +228,7 @@ async def ask_weather_question(
                 "source": "default"
             }
         else:
-            place_name = intent.get("place", "Mumbai")
+            place_name = intent.get("place") or user.location or "Delhi"
             try:
                 place_info = await geocoding_service.geocode(place_name)
                 lat, lng = place_info["lat"], place_info["lng"]
@@ -297,7 +238,6 @@ async def ask_weather_question(
 
         # Step 2b: Fetch weather data based on intent
         if intent.get("intent") == "historical":
-            # Handle historical/climate queries
             historical_data = await _fetch_historical_data(
                 lat=lat,
                 lng=lng,
@@ -307,9 +247,7 @@ async def ask_weather_question(
             weather_data = historical_data
             severity = {"severity": "normal", "alerts": [], "alert_count": 0}
         else:
-            # Fetch current/forecast weather data from Open-Meteo
             weather_data = await weather_service.fetch_weather(lat, lng)
-            # Classify severity
             severity = weather_service.classify_severity(weather_data)
 
         # Step 3: Generate grounded response (LLM call #2)
@@ -325,9 +263,7 @@ async def ask_weather_question(
             weather_data=combined_data,
             role=request.role,
             language=request.language,
-            occupation=user.occupation,  # Inject occupation for personalization
-            user_groq_key=user_groq_key,
-            user_gemini_key=user_gemini_key
+            occupation=user.occupation
         )
 
         # Build response

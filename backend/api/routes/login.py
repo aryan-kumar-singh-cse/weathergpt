@@ -1,10 +1,10 @@
 """
-WeatherGPT Login Endpoint
-Lightweight email-based login for personalization and fair-use
+WeatherGPT Login & User Profile Endpoints
+Lightweight email-based login for personalization and fair-use tracking
 """
 
 from fastapi import APIRouter, HTTPException, Depends
-from pydantic import BaseModel, EmailStr, field_validator
+from pydantic import BaseModel, EmailStr
 from sqlalchemy.orm import Session
 import logging
 from typing import Optional
@@ -20,44 +20,28 @@ router = APIRouter()
 class LoginRequest(BaseModel):
     """Request model for login endpoint."""
     email: EmailStr
+    name: Optional[str] = None
     occupation: str
-    groq_api_key: Optional[str] = None
-    gemini_api_key: Optional[str] = None
-
-    @field_validator('groq_api_key')
-    @classmethod
-    def validate_groq_key(cls, v):
-        """Validate Groq API key format."""
-        if v is not None and v.strip():
-            if not v.startswith('gsk_'):
-                raise ValueError('Groq API key must start with "gsk_"')
-        return v
-
-    @field_validator('gemini_api_key')
-    @classmethod
-    def validate_gemini_key(cls, v):
-        """Validate Gemini API key format."""
-        if v is not None and v.strip():
-            # Gemini keys can start with different prefixes (AIza, AQ, etc.)
-            # Just validate it's not empty and has reasonable length
-            if len(v.strip()) < 10:
-                raise ValueError('Gemini API key appears to be too short')
-        return v
-
-    def has_at_least_one_key(self) -> bool:
-        """Check if at least one API key is provided."""
-        return bool((self.groq_api_key and self.groq_api_key.strip()) or
-                   (self.gemini_api_key and self.gemini_api_key.strip()))
+    location: Optional[str] = "Delhi"
+    preferred_language: Optional[str] = "en"
 
 
 class LoginResponse(BaseModel):
     """Response model for login endpoint."""
     email: str
+    name: Optional[str] = None
     occupation: str
+    location: Optional[str] = "Delhi"
+    preferred_language: Optional[str] = "en"
     message: str
     is_new_user: bool
-    has_groq_key: bool
-    has_gemini_key: bool
+
+
+class ProfileUpdateRequest(BaseModel):
+    """Request model for updating profile fields."""
+    email: EmailStr
+    location: Optional[str] = None
+    preferred_language: Optional[str] = None
 
 
 @router.post("/login", response_model=LoginResponse)
@@ -66,62 +50,32 @@ async def login(
     db: Session = Depends(get_db_dependency)
 ):
     """
-    Login or create user with email and occupation.
-
-    This is a lightweight authentication system for personalization and fair-use tracking.
-    - No passwords or verification required
-    - Email is used as identifier for rate limiting
-    - Occupation is used to personalize AI responses
-
-    Args:
-        request: LoginRequest with email and occupation
-        db: Database session
-
-    Returns:
-        LoginResponse with user details and welcome message
-
-    Example:
-        POST /api/v1/login
-        {
-            "email": "farmer@example.com",
-            "occupation": "Rice farmer in Punjab"
-        }
+    Login or create user with email and profile details.
     """
     try:
-        # Validate that at least one API key is provided
-        if not request.has_at_least_one_key():
-            raise HTTPException(
-                status_code=400,
-                detail="At least one API key (Groq or Gemini) must be provided"
-            )
-
-        # Check if user already exists
-        existing_user = auth_service.get_user(request.email, db)
+        existing_user = auth_service.get_user(str(request.email), db)
         is_new_user = existing_user is None
 
-        # Login or create user with API keys
         user = auth_service.login_or_create_user(
-            email=request.email,
+            email=str(request.email),
+            name=request.name,
             occupation=request.occupation,
-            groq_api_key=request.groq_api_key.strip() if request.groq_api_key else None,
-            gemini_api_key=request.gemini_api_key.strip() if request.gemini_api_key else None,
+            location=request.location,
+            preferred_language=request.preferred_language,
             db=db
         )
 
-        message = (
-            "Welcome to WeatherGPT!" if is_new_user
-            else "Welcome back to WeatherGPT!"
-        )
-
+        message = "Welcome to WeatherGPT!" if is_new_user else "Welcome back to WeatherGPT!"
         logger.info(f"User logged in: {user.email} (new={is_new_user})")
 
         return LoginResponse(
             email=user.email,
+            name=user.name,
             occupation=user.occupation,
+            location=user.location or "Delhi",
+            preferred_language=user.preferred_language or "en",
             message=message,
-            is_new_user=is_new_user,
-            has_groq_key=bool(user.groq_api_key),
-            has_gemini_key=bool(user.gemini_api_key)
+            is_new_user=is_new_user
         )
 
     except ValueError as e:
@@ -140,60 +94,24 @@ async def login(
 @router.get("/login/status")
 async def get_login_status(email: str, db: Session = Depends(get_db_dependency)):
     """
-    Check if a user exists and get their occupation + encrypted API keys for client-side storage.
-
-    Returns 200 with user data if found, 404 if not found (for new user registration flow).
-
-    Args:
-        email: User's email address
-        db: Database session
-
-    Returns:
-        User status, occupation, and encrypted API keys if found, or 404 if new user
+    Check if a user exists and retrieve their current profile.
     """
     try:
-        from datetime import datetime
-        from backend.services.encryption_service import encryption_service
-
-        # Normalize email
         normalized_email = email.strip().lower()
-
         user = auth_service.get_user(normalized_email, db)
 
         if not user:
-            # User doesn't exist - return 404 to trigger registration flow
             raise HTTPException(status_code=404, detail="User not found")
-
-        # Update last login timestamp
-        user.last_login = datetime.utcnow()
-        db.commit()
-
-        # Decrypt API keys to send back to client for localStorage storage
-        groq_key = None
-        gemini_key = None
-
-        if user.groq_api_key:
-            try:
-                groq_key = encryption_service.decrypt(user.groq_api_key)
-            except Exception as e:
-                logger.error(f"Failed to decrypt Groq key for {email}: {e}")
-
-        if user.gemini_api_key:
-            try:
-                gemini_key = encryption_service.decrypt(user.gemini_api_key)
-            except Exception as e:
-                logger.error(f"Failed to decrypt Gemini key for {email}: {e}")
 
         return {
             "exists": True,
             "email": user.email,
+            "name": user.name,
             "occupation": user.occupation,
-            "groq_api_key": groq_key,
-            "gemini_api_key": gemini_key,
-            "has_groq_key": bool(groq_key),
-            "has_gemini_key": bool(gemini_key),
-            "created_at": user.created_at.isoformat(),
-            "last_login": user.last_login.isoformat()
+            "location": user.location or "Delhi",
+            "preferred_language": user.preferred_language or "en",
+            "created_at": user.created_at.isoformat() if user.created_at else None,
+            "last_login": user.last_login.isoformat() if user.last_login else None
         }
 
     except HTTPException:
@@ -204,3 +122,37 @@ async def get_login_status(email: str, db: Session = Depends(get_db_dependency))
             status_code=500,
             detail="Failed to check user status"
         )
+
+
+@router.put("/user/profile")
+@router.patch("/login/profile")
+async def update_user_profile(
+    request: ProfileUpdateRequest,
+    db: Session = Depends(get_db_dependency)
+):
+    """
+    Update user location and/or language preference independently.
+    """
+    try:
+        user = auth_service.update_profile(
+            email=str(request.email),
+            location=request.location,
+            preferred_language=request.preferred_language,
+            db=db
+        )
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        return {
+            "success": True,
+            "email": user.email,
+            "location": user.location,
+            "preferred_language": user.preferred_language,
+            "message": "Profile updated successfully"
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Profile update error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to update profile")
+

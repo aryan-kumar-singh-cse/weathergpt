@@ -64,11 +64,12 @@ export const statusColors = {
 } as const
 
 // Severity level mapping
-export type SeverityLevel = 'normal' | 'warning' | 'severe' | 'extreme'
+export type SeverityLevel = 'normal' | 'watch' | 'warning' | 'severe' | 'extreme'
 export type StatusLevel = 'good' | 'warning' | 'serious' | 'critical'
 
 export const severityToStatus: Record<SeverityLevel, StatusLevel> = {
   normal: 'good',
+  watch: 'warning',
   warning: 'warning',
   severe: 'serious',
   extreme: 'critical'

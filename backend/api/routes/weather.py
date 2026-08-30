@@ -143,6 +143,38 @@ async def get_daily_forecast(
         raise HTTPException(status_code=500, detail="Failed to fetch forecast")
 
 
+@router.get("/forecast/outlook30")
+async def get_30_day_outlook(
+    lat: Optional[float] = None,
+    lng: Optional[float] = None,
+    city: Optional[str] = None
+):
+    """
+    Get 30-day extended weather and climate outlook with disclaimer.
+    """
+    try:
+        if city:
+            try:
+                location = await geocoding_service.geocode(city)
+                lat, lng = location["lat"], location["lng"]
+            except GeocodingError:
+                raise HTTPException(status_code=404, detail=f"City '{city}' not found")
+
+        if lat is None or lng is None:
+            raise HTTPException(
+                status_code=400,
+                detail="Either provide coordinates (lat, lng) or city name"
+            )
+
+        outlook = await weather_service.fetch_30_day_outlook(lat, lng)
+        return outlook
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error fetching 30-day outlook: {e}")
+        raise HTTPException(status_code=500, detail="Failed to fetch 30-day outlook")
+
+
 @router.get("/alerts")
 async def get_weather_alerts(
     lat: Optional[float] = None,

@@ -1,360 +1,327 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { Search, Menu, Sun, Cloud, CloudRain, Wind, Droplets, Thermometer, MapPin, MessageSquare, Mic, Moon, Sun as SunIcon, Sparkles } from "lucide-react"
+import React, { useState, useEffect, useCallback } from "react"
+import { Cloud, Moon, Sun, User, Settings, LogOut, ShieldAlert } from "lucide-react"
 import { toast } from "react-hot-toast"
 import { useTheme } from "next-themes"
 import ErrorBoundary from "@/components/ErrorBoundary"
 import ThemeProvider from "@/components/ThemeProvider"
+import { LanguageProvider, useTranslation } from "@/lib/i18n"
 import WeatherCard from "@/components/WeatherCard"
 import ChatInterface from "@/components/ChatInterface"
 import LocationSelector from "@/components/LocationSelector"
-import LanguageSelector from "@/components/LanguageSelector"
 import RoleSelector from "@/components/RoleSelector"
 import SeverityBanner from "@/components/SeverityBanner"
 import LoginCard from "@/components/LoginCard"
-import { getCurrentWeatherByCity } from "@/lib/api"
-import { AlertData, WeatherData, ForecastData } from "@/lib/types"
+import ProfileModal from "@/components/ProfileModal"
+import { getCurrentWeatherByCity, get30DayOutlook, getUserStatus } from "@/lib/api"
+import { findCityDetails } from "@/lib/india-locations"
+import { ForecastDay, Outlook30Data } from "@/lib/types"
 
-export default function Home() {
-  // Theme management
+function MainDashboard() {
   const { theme, setTheme } = useTheme()
+  const { t, language, setLanguage } = useTranslation()
   const [mounted, setMounted] = useState(false)
 
-  // Authentication state - using proper state machine to avoid race conditions
-  const [authState, setAuthState] = useState<'checking' | 'authenticated' | 'unauthenticated'>('checking')
-  const [userEmail, setUserEmail] = useState<string>("")
-  const [userOccupation, setUserOccupation] = useState<string>("")
+  // Authentication State
+  const [authState, setAuthState] = useState<"checking" | "authenticated" | "unauthenticated">("checking")
+  const [userEmail, setUserEmail] = useState("")
+  const [userName, setUserName] = useState("")
+  const [userOccupation, setUserOccupation] = useState("")
 
-  // App state
-  const [selectedLocation, setSelectedLocation] = useState<string>("")
-  const [isSearching, setIsSearching] = useState(false)
-  const [weatherData, setWeatherData] = useState<WeatherData | null>(null)
-  const [forecastData, setForecastData] = useState<ForecastData | null>(null)
+  // Location & Preferences
+  const [selectedLocation, setSelectedLocation] = useState("Delhi")
+  const [role, setRole] = useState("citizen")
+  const [isProfileOpen, setIsProfileOpen] = useState(false)
+
+  // Weather Data State
+  const [currentWeather, setCurrentWeather] = useState<any>(null)
+  const [forecastDays, setForecastDays] = useState<ForecastDay[]>([])
+  const [outlook30, setOutlook30] = useState<Outlook30Data | null>(null)
   const [alerts, setAlerts] = useState<string[]>([])
-  const [isLoading, setIsLoading] = useState(false)
-  const [sidebarOpen, setSidebarOpen] = useState(false)
-  const [role, setRole] = useState<string>("citizen")
-  const [language, setLanguage] = useState<string>("en")
+  const [severityLevel, setSeverityLevel] = useState<"normal" | "watch" | "warning" | "severe" | "extreme">("normal")
+  const [isLoadingWeather, setIsLoadingWeather] = useState(false)
 
-  const locations = [
-    { name: "Mumbai", state: "Maharashtra", lat: 19.076, lng: 72.8777 },
-    { name: "Delhi", state: "Delhi", lat: 28.7041, lng: 77.1025 },
-    { name: "Bangalore", state: "Karnataka", lat: 12.9716, lng: 77.5946 },
-    { name: "Chennai", state: "Tamil Nadu", lat: 13.0827, lng: 80.2707 },
-    { name: "Kolkata", state: "West Bengal", lat: 22.5726, lng: 88.3639 },
-    { name: "Hyderabad", state: "Telangana", lat: 17.3850, lng: 78.4867 },
-    { name: "Pune", state: "Maharashtra", lat: 18.5204, lng: 73.8567 },
-    { name: "Ahmedabad", state: "Gujarat", lat: 23.0225, lng: 72.5714 },
-    { name: "Jaipur", state: "Rajasthan", lat: 26.9124, lng: 75.7873 },
-    { name: "Lucknow", state: "Uttar Pradesh", lat: 26.8467, lng: 80.9462 },
-    { name: "Kochi", state: "Kerala", lat: 9.9312, lng: 76.2534 },
-    { name: "Goa", state: "Goa", lat: 15.2993, lng: 73.9892 },
-    { name: "Surat", state: "Gujarat", lat: 21.1702, lng: 72.8311 },
-    { name: "Bhubaneswar", state: "Odisha", lat: 20.2961, lng: 85.8245 },
-  ]
-
-  // SSR-safe mounting flag
   useEffect(() => {
     setMounted(true)
   }, [])
 
-  // Check for stored credentials on mount and verify with backend
+  // Check stored credentials on mount (prefer locally persisted values, verify session via backend)
   useEffect(() => {
-    const checkAuth = async () => {
+    const initAuth = async () => {
       try {
-        const storedEmail = localStorage.getItem('weathergpt_email')
-        const storedOccupation = localStorage.getItem('weathergpt_occupation')
+        const storedEmail = localStorage.getItem("weathergpt_email")
+        const storedName = localStorage.getItem("weathergpt_name") || ""
+        const storedOccupation = localStorage.getItem("weathergpt_occupation") || ""
+        const storedLocation = localStorage.getItem("weathergpt_location") || "Delhi"
+        const storedLanguage = localStorage.getItem("weathergpt_language") || "en"
 
-        if (storedEmail && storedOccupation) {
-          // Verify with backend that user still exists
-          const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1'
+        if (storedEmail) {
+          // Immediately populate local values for display
+          setUserEmail(storedEmail)
+          setUserName(storedName)
+          setUserOccupation(storedOccupation)
+          setSelectedLocation(storedLocation)
+          setLanguage(storedLanguage)
 
+          // Verify session with backend
           try {
-            const response = await fetch(`${API_URL}/login/status?email=${encodeURIComponent(storedEmail)}`)
-
-            if (response.ok) {
-              // User exists in backend - use their current data
-              const data = await response.json()
-              setUserEmail(data.email)
-              setUserOccupation(data.occupation)
-              setAuthState('authenticated')
+            const status = await getUserStatus(storedEmail)
+            if (status && status.exists) {
+              setAuthState("authenticated")
             } else {
-              // User no longer exists - clear localStorage and show login
-              localStorage.removeItem('weathergpt_email')
-              localStorage.removeItem('weathergpt_occupation')
-              setAuthState('unauthenticated')
+              setAuthState("unauthenticated")
             }
           } catch (backendError) {
-            // Backend unreachable - trust localStorage for now
-            console.warn('Backend unreachable, using cached credentials:', backendError)
-            setUserEmail(storedEmail)
-            setUserOccupation(storedOccupation)
-            setAuthState('authenticated')
+            // Backend offline/unreachable: trust local cached credentials
+            setAuthState("authenticated")
           }
         } else {
-          setAuthState('unauthenticated')
+          setAuthState("unauthenticated")
         }
       } catch (error) {
-        console.error('Auth check failed:', error)
-        setAuthState('unauthenticated')
+        setAuthState("unauthenticated")
       }
     }
 
-    checkAuth()
+    initAuth()
+  }, [setLanguage])
+
+  // Fetch weather data when location changes
+  const fetchWeather = useCallback(async (city: string) => {
+    setIsLoadingWeather(true)
+    try {
+      const cityDetails = findCityDetails(city)
+      const lat = cityDetails?.lat
+      const lng = cityDetails?.lng
+
+      // 1. Current Weather
+      const weatherRes = await getCurrentWeatherByCity(city)
+      setCurrentWeather(weatherRes.current || null)
+
+      // 2. 7-Day Forecast
+      const forecast = weatherRes.forecast?.daily || []
+      setForecastDays(forecast)
+
+      // 3. 30-Day Outlook
+      try {
+        const outlookRes = await get30DayOutlook(lat, lng, city)
+        setOutlook30(outlookRes)
+      } catch (e) {
+        setOutlook30(null)
+      }
+
+      // 4. Alerts & Severity
+      const alertList = (weatherRes.severity?.alerts as string[]) || []
+      setAlerts(alertList)
+      setSeverityLevel(weatherRes.severity?.severity || "normal")
+    } catch (error: any) {
+      toast.error(error?.message || "Failed to load weather data")
+    } finally {
+      setIsLoadingWeather(false)
+    }
   }, [])
 
-  const handleLoginSuccess = (email: string, occupation: string) => {
+  useEffect(() => {
+    if (authState === "authenticated" && selectedLocation) {
+      fetchWeather(selectedLocation)
+    }
+  }, [authState, selectedLocation, fetchWeather])
+
+  const handleLoginSuccess = (
+    email: string,
+    occupation: string,
+    name?: string,
+    location?: string,
+    prefLang?: string
+  ) => {
     setUserEmail(email)
     setUserOccupation(occupation)
-    setAuthState('authenticated')
-    toast.success('Welcome to WeatherGPT!')
-  }
-
-  const handleAuthError = () => {
-    // Clear stored credentials and show login
-    localStorage.removeItem('weathergpt_email')
-    localStorage.removeItem('weathergpt_occupation')
-    setAuthState('unauthenticated')
-    setUserEmail("")
-    setUserOccupation("")
-    toast.error('Please login again')
+    if (name) setUserName(name)
+    if (location) setSelectedLocation(location)
+    if (prefLang) setLanguage(prefLang)
+    setAuthState("authenticated")
+    toast.success(`Welcome to WeatherGPT!`)
   }
 
   const handleLogout = () => {
-    localStorage.removeItem('weathergpt_email')
-    localStorage.removeItem('weathergpt_occupation')
-    setAuthState('unauthenticated')
+    localStorage.removeItem("weathergpt_email")
+    localStorage.removeItem("weathergpt_name")
+    localStorage.removeItem("weathergpt_occupation")
+    setAuthState("unauthenticated")
     setUserEmail("")
+    setUserName("")
     setUserOccupation("")
-    toast.success('Logged out successfully')
+    toast.success("Logged out successfully")
   }
 
-  const fetchWeatherData = async (locationName: string) => {
-    setIsLoading(true)
-    try {
-      const location = locations.find(l => l.name === locationName)
-      if (!location) return
-
-      const weather = await getCurrentWeatherByCity(locationName)
-
-      setWeatherData(weather)
-      setForecastData(weather.forecast || null)
-      // API returns alerts as string[], not AlertData[]
-      setAlerts((weather.severity?.alerts as unknown as string[]) || [])
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : "Failed to fetch weather data"
-      toast.error(errorMessage)
-      setWeatherData(null)
-      setForecastData(null)
-      setAlerts([])
-    } finally {
-      setIsLoading(false)
-    }
+  const handleLocationSelect = (loc: string) => {
+    setSelectedLocation(loc)
+    localStorage.setItem("weathergpt_location", loc)
+    toast.success(`Location set to ${loc}`)
   }
 
-  useEffect(() => {
-    if (selectedLocation && authState === 'authenticated') {
-      fetchWeatherData(selectedLocation)
-    }
-  }, [selectedLocation, authState])
-
-  const handleSearch = (query: string) => {
-    setIsSearching(true)
-    const found = locations.find(l => l.name.toLowerCase() === query.toLowerCase())
-    if (found) {
-      setSelectedLocation(found.name)
-      setIsSearching(false)
-    } else {
-      toast.error("Location not found")
-      setIsSearching(false)
-    }
+  const handleProfileUpdated = (newLocation: string, newLang: string) => {
+    setSelectedLocation(newLocation)
+    setLanguage(newLang)
   }
 
-  const toggleDarkMode = () => {
-    setTheme(theme === 'dark' ? 'light' : 'dark')
-  }
-
-  // Show loading state while checking authentication
-  if (authState === 'checking') {
+  if (authState === "checking") {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-white dark:bg-black gradient-mesh">
-        <div className="text-center">
-          <div className="w-16 h-16 bg-gradient-to-br from-yellow-400 to-yellow-500 rounded-2xl flex items-center justify-center shadow-2xl mx-auto mb-4 animate-pulse">
+      <div className="min-h-screen flex items-center justify-center bg-white dark:bg-black">
+        <div className="text-center space-y-4">
+          <div className="w-16 h-16 bg-yellow-400 rounded-2xl flex items-center justify-center shadow-2xl mx-auto animate-pulse">
             <Cloud className="w-8 h-8 text-black" />
           </div>
-          <p className="text-gray-700 dark:text-gray-300 font-medium">Loading WeatherGPT...</p>
+          <p className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+            {t("loading")}
+          </p>
         </div>
       </div>
     )
   }
 
-  // Show login screen if not authenticated
-  if (authState === 'unauthenticated') {
+  if (authState === "unauthenticated") {
     return <LoginCard onLoginSuccess={handleLoginSuccess} />
   }
 
   return (
-    <ErrorBoundary>
-      <div className="min-h-screen bg-white dark:bg-black gradient-mesh transition-colors duration-300">
-      {/* Header */}
-      <header className="sticky top-0 z-50 glass border-b backdrop-blur-xl border-gray-200 dark:border-yellow-500/20">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 bg-gradient-to-br from-yellow-400 to-yellow-500 rounded-2xl flex items-center justify-center shadow-2xl shadow-yellow-500/20">
-                <Cloud className="w-7 h-7 text-black" />
-              </div>
-              <div>
-                <h1 className="text-xl font-bold text-black dark:text-white">WeatherGPT</h1>
-                <p className="text-xs text-gray-600 dark:text-gray-400 font-medium">Smart Weather Insights</p>
-              </div>
+    <div className="min-h-screen bg-gray-50/50 dark:bg-black text-gray-900 dark:text-gray-100 transition-colors duration-300 flex flex-col">
+      {/* Top Navigation Bar */}
+      <header className="sticky top-0 z-40 bg-white/80 dark:bg-gray-900/80 backdrop-blur-xl border-b border-gray-200 dark:border-yellow-500/20">
+        <div className="container mx-auto px-4 py-3.5 flex items-center justify-between">
+          {/* Logo & Title */}
+          <div className="flex items-center gap-3">
+            <div className="w-11 h-11 bg-gradient-to-br from-yellow-400 to-yellow-500 rounded-2xl flex items-center justify-center shadow-lg shadow-yellow-500/20">
+              <Cloud className="w-6 h-6 text-black" />
             </div>
-
-            <div className="flex items-center gap-3">
-              {/* User Info */}
-              <div className="hidden md:flex items-center gap-2 px-4 py-2 bg-white/80 dark:bg-gray-900/80 rounded-full text-xs border border-gray-200 dark:border-yellow-500/20 shadow-sm">
-                <span className="text-gray-700 dark:text-gray-300 font-semibold">{userOccupation}</span>
-                <span className="text-gray-400 dark:text-gray-600">•</span>
-                <button
-                  onClick={handleLogout}
-                  className="text-yellow-600 dark:text-yellow-400 hover:underline font-semibold transition-colors"
-                >
-                  Logout
-                </button>
-              </div>
-
-              {/* Dark Mode Toggle */}
-              {mounted && (
-                <button
-                  onClick={toggleDarkMode}
-                  className="p-2.5 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl transition-colors shadow-sm"
-                  aria-label="Toggle dark mode"
-                >
-                  {theme === 'dark' ? (
-                    <SunIcon className="w-5 h-5 text-yellow-400" />
-                  ) : (
-                    <Moon className="w-5 h-5 text-gray-600" />
-                  )}
-                </button>
-              )}
+            <div>
+              <h1 className="text-lg font-black text-gray-900 dark:text-white leading-tight">
+                WeatherGPT
+              </h1>
+              <p className="text-[11px] font-semibold text-yellow-600 dark:text-yellow-400">
+                {t("app_subtitle")}
+              </p>
             </div>
+          </div>
+
+          {/* User Controls */}
+          <div className="flex items-center gap-2.5 sm:gap-3">
+            {/* User Badge */}
+            <button
+              type="button"
+              onClick={() => setIsProfileOpen(true)}
+              className="flex items-center gap-2 px-3.5 py-1.5 bg-gray-100 dark:bg-gray-800 hover:bg-yellow-50 dark:hover:bg-yellow-900/20 border border-gray-200 dark:border-gray-700 rounded-full text-xs font-semibold transition-all group"
+            >
+              <User className="w-3.5 h-3.5 text-yellow-500" />
+              <span className="max-w-[120px] truncate">{userName || userOccupation || userEmail}</span>
+              <Settings className="w-3.5 h-3.5 text-gray-400 group-hover:text-yellow-500 transition-colors ml-0.5" />
+            </button>
+
+            {/* Dark Mode Switcher */}
+            {mounted && (
+              <button
+                type="button"
+                onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+                className="p-2.5 rounded-2xl bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 transition-colors"
+                aria-label="Toggle theme"
+              >
+                {theme === "dark" ? (
+                  <Sun className="w-4 h-4 text-yellow-400" />
+                ) : (
+                  <Moon className="w-4 h-4 text-gray-600" />
+                )}
+              </button>
+            )}
+
+            {/* Logout Button */}
+            <button
+              type="button"
+              onClick={handleLogout}
+              className="p-2.5 rounded-2xl bg-gray-100 dark:bg-gray-800 hover:bg-red-50 dark:hover:bg-red-900/20 text-gray-600 hover:text-red-600 dark:text-gray-400 dark:hover:text-red-400 transition-colors"
+              title={t("logout")}
+            >
+              <LogOut className="w-4 h-4" />
+            </button>
           </div>
         </div>
       </header>
 
-      {/* Main Content */}
-      <main className="container mx-auto px-4 py-6">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Weather Card */}
-          <div className="lg:col-span-2 space-y-6">
+      {/* Main Grid Content */}
+      <main className="container mx-auto px-4 py-6 flex-1">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+          {/* Left Column: Weather Intelligence & Forecasts (7 cols) */}
+          <div className="lg:col-span-7 space-y-6">
             {/* Severity Alert Banner */}
-            <SeverityBanner
-              severity={weatherData?.severity?.severity || 'normal'}
-              alerts={alerts}
+            <SeverityBanner severity={severityLevel} alerts={alerts} />
+
+            {/* Main Weather Card (Current + 7-day + 30-day) */}
+            <WeatherCard
+              weather={currentWeather}
+              forecastDays={forecastDays}
+              outlook30={outlook30}
+              locationName={selectedLocation}
+              isLoading={isLoadingWeather}
             />
-
-            <WeatherCard weather={weatherData?.current || null} isLoading={isLoading} />
-
-            {/* Forecast */}
-            {forecastData?.daily && (
-              <div className="glass rounded-3xl p-6 shadow-xl">
-                <div className="flex items-center gap-2 mb-4">
-                  <Cloud className="w-5 h-5 text-teal-600 dark:text-teal-400" />
-                  <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">7-Day Forecast</h2>
-                </div>
-                <div className="space-y-3">
-                  {forecastData.daily.map((day, index: number) => (
-                    <div key={index} className="flex items-center justify-between py-3 border-b border-teal-200/30 dark:border-teal-900/30 last:border-0">
-                      <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">{day.date}</span>
-                      <div className="flex items-center gap-2">
-                        <span className="text-2xl">
-                          {day.weather_code === 0 && '☀️'}
-                          {day.weather_code === 1 && '🌤️'}
-                          {day.weather_code === 2 && '⛅'}
-                          {day.weather_code === 3 && '☁️'}
-                          {(day.weather_code === 61 || day.weather_code === 63 || day.weather_code === 65) && '🌧️'}
-                          {(day.weather_code === 95 || day.weather_code === 96 || day.weather_code === 99) && '⛈️'}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-4">
-                        <span className="text-sm text-slate-600 dark:text-slate-400 font-medium">{day.temperature_min}°</span>
-                        <span className="font-bold text-slate-900 dark:text-slate-100">{day.temperature_max}°</span>
-                        <span className="text-sm text-teal-600 dark:text-teal-400 font-medium">
-                          {day.precipitation_probability}% 🌧️
-                        </span>
-                        <span className="text-sm text-slate-500 dark:text-slate-400 font-medium">
-                          {day.wind_speed_max} km/h
-                        </span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
           </div>
 
-          {/* Sidebar */}
-          <div className="space-y-6">
-            {/* Location Selector */}
-            <LocationSelector
-              locations={locations}
-              selectedLocation={selectedLocation}
-              onSelect={setSelectedLocation}
-            />
-
-            {/* Language Selector */}
-            <LanguageSelector onLanguageChange={setLanguage} />
-
-            {/* Chat Interface */}
-            <div className="glass rounded-3xl p-6 shadow-2xl border border-gray-200 dark:border-yellow-500/20">
-              <div className="flex items-center gap-3 mb-6">
-                <div className="w-10 h-10 bg-gradient-to-br from-yellow-400 to-yellow-500 rounded-2xl flex items-center justify-center shadow-lg">
-                  <MessageSquare className="w-5 h-5 text-black" />
-                </div>
-                <h2 className="text-lg font-bold text-gray-900 dark:text-gray-100">Ask WeatherGPT</h2>
+          {/* Right Column: Location, Persona & AI Chat (5 cols) */}
+          <div className="lg:col-span-5 space-y-5">
+            {/* Location Selector (State -> City hierarchical overlay) */}
+            <div className="bg-white/80 dark:bg-gray-900/80 backdrop-blur-xl rounded-3xl p-4 border border-gray-200 dark:border-yellow-500/20 shadow-xl space-y-2">
+              <div className="text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300">
+                {t("location")}
               </div>
-              <ChatInterface
-                location={selectedLocation || "your location"}
-                role="citizen"
-                language={language}
-                email={userEmail}
-                onAuthError={handleAuthError}
+              <LocationSelector
+                selectedLocation={selectedLocation}
+                onSelect={handleLocationSelect}
               />
             </div>
+
+            {/* Persona / Role Selector */}
+            <RoleSelector value={role} onChange={setRole} />
+
+            {/* AI Conversational Assistant */}
+            <ChatInterface
+              location={selectedLocation}
+              role={role}
+              language={language}
+              email={userEmail}
+              onAuthError={() => setAuthState("unauthenticated")}
+            />
           </div>
         </div>
       </main>
 
-      {/* Mobile Search Dropdown */}
-      {isSearching && (
-        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm lg:hidden flex items-start justify-center pt-20">
-          <div className="bg-white dark:bg-gray-800 rounded-2xl p-4 w-[90%] max-w-md shadow-2xl border border-gray-200 dark:border-gray-700">
-            <div className="space-y-2">
-              {locations.map((location) => (
-                <button
-                  key={location.name}
-                  onClick={() => handleSearch(location.name)}
-                  className="w-full text-left px-4 py-3 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
-                >
-                  <div className="font-medium text-gray-900 dark:text-white">{location.name}</div>
-                  <div className="text-sm text-gray-500 dark:text-gray-400">{location.state}</div>
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Profile Management Modal */}
+      <ProfileModal
+        isOpen={isProfileOpen}
+        onClose={() => setIsProfileOpen(false)}
+        email={userEmail}
+        currentLocation={selectedLocation}
+        currentLanguage={language}
+        onProfileUpdated={handleProfileUpdated}
+      />
 
       {/* Footer */}
-      <footer className="border-t border-gray-200 dark:border-yellow-500/20 mt-auto backdrop-blur-sm">
-        <div className="container mx-auto px-4 py-6">
-          <p className="text-center text-sm text-gray-600 dark:text-gray-400 font-medium">
-            WeatherGPT © 2026. AI-powered weather forecasting with personalized responses.
-          </p>
+      <footer className="border-t border-gray-200 dark:border-yellow-500/20 py-4 bg-white/50 dark:bg-gray-950/50 backdrop-blur-sm mt-auto">
+        <div className="container mx-auto px-4 flex flex-col sm:flex-row items-center justify-between text-xs text-gray-500 dark:text-gray-400 gap-2">
+          <span>WeatherGPT © 2026 • SIH26068 AI Weather Intelligence</span>
+          <span>Zero-Config Multi-Tier LLM Architecture</span>
         </div>
       </footer>
-      </div>
+    </div>
+  )
+}
+
+export default function Home() {
+  return (
+    <ErrorBoundary>
+      <ThemeProvider attribute="class" defaultTheme="dark" enableSystem>
+        <LanguageProvider>
+          <MainDashboard />
+        </LanguageProvider>
+      </ThemeProvider>
     </ErrorBoundary>
   )
 }

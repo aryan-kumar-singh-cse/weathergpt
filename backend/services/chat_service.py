@@ -76,30 +76,12 @@ class ChatService:
     async def extract_intent(
         self,
         query: str,
-        language: str = "en",
-        user_groq_key: Optional[str] = None,
-        user_gemini_key: Optional[str] = None
+        language: str = "en"
     ) -> Dict[str, Any]:
         """
         Step 1: Extract intent and entities from natural language query.
-
-        Uses LLM with JSON output mode to parse:
-        - place: geocodable location name
-        - language: detected language code
-        - intent: one of [current, forecast, risk_check, historical, briefing]
-        - nationwide: if the query asks about a region/state rather than specific location
-
-        Args:
-            query: User's natural language question
-            language: User's preferred language (from request)
-            user_groq_key: User's Groq API key (optional)
-            user_gemini_key: User's Gemini API key (optional)
-
-        Returns:
-            Dict with keys: place, language, intent, nationwide, confidence
         """
         logger.info(f"🔍 INTENT EXTRACTION START - Query: '{query}'")
-        logger.info(f"🔑 API Keys Available: Groq={bool(user_groq_key)}, Gemini={bool(user_gemini_key)}")
 
         system_prompt = (
             f"You are a weather query understanding system. "
@@ -126,8 +108,6 @@ class ChatService:
             logger.info("📞 Calling LLM for intent extraction...")
             response = await self.llm.call_llm(
                 messages=messages,
-                groq_api_key=user_groq_key,
-                gemini_api_key=user_gemini_key,
                 temperature=0.3,
                 max_tokens=200,
                 json_mode=True
@@ -215,44 +195,22 @@ class ChatService:
         weather_data: Dict[str, Any],
         role: str = "citizen",
         language: str = "en",
-        occupation: Optional[str] = None,
-        user_groq_key: Optional[str] = None,
-        user_gemini_key: Optional[str] = None
+        occupation: Optional[str] = None
     ) -> str:
         """
         Step 2: Generate grounded response using retrieved weather data.
-
-        The LLM is constrained to ONLY use numbers present in the grounding data.
-        Response style varies by role per spec Section 1.4.
-
-        Args:
-            query: Original user question
-            intent: Extracted intent data
-            weather_data: Weather data from Open-Meteo (including severity)
-            role: User role for role-aware output
-            language: Response language
-            occupation: User's occupation for personalization (optional)
-            user_groq_key: User's Groq API key (optional)
-            user_gemini_key: User's Gemini API key (optional)
-
-        Returns:
-            Natural language weather response
         """
         logger.info(f"🎯 RESPONSE GENERATION START - Query: '{query}'")
-        logger.info(f"🔑 API Keys Available: Groq={bool(user_groq_key)}, Gemini={bool(user_gemini_key)}")
         logger.info(f"👤 Role: {role}, Occupation: {occupation}, Language: {language}")
 
         role_prompt = ROLE_PROMPTS.get(role, ROLE_PROMPTS["citizen"])
 
-        # Add occupation-based personalization if provided
         if occupation:
             role_prompt += f"\n\nUser context: The person asking is a {occupation}. Tailor your response to be relevant to their work and concerns."
 
-        # Format grounding data for the LLM
         grounding = self._format_grounding(weather_data, intent)
         logger.info(f"📊 Grounding data prepared: {len(grounding)} characters")
 
-        # Multilingual instruction
         language_prompt = ""
         if language != "en":
             language_prompt = f"\n\nRespond in {language}. Use weather terminology appropriate for that language."
@@ -267,10 +225,8 @@ class ChatService:
             logger.info("📞 Calling LLM for response generation...")
             response = await self.llm.call_llm(
                 messages=messages,
-                groq_api_key=user_groq_key,
-                gemini_api_key=user_gemini_key,
                 temperature=0.7,
-                max_tokens=1500,  # Increased from 500 to allow complete 7-day forecasts
+                max_tokens=1500,
                 json_mode=False
             )
 
@@ -280,7 +236,6 @@ class ChatService:
 
         except Exception as e:
             logger.error(f"❌ Response generation failed with error: {type(e).__name__}: {str(e)}")
-            logger.error(f"📋 Full error details:", exc_info=True)
             logger.warning(f"⚠️ Falling back to template response")
             return self._fallback_response(query, intent, weather_data, role, language)
 
