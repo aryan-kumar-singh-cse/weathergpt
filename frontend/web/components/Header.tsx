@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import SettingsPanel, { Preferences } from "./SettingsPanel";
+import LocationSearchBar from "./LocationSearchBar";
 import { Cloud, User, Calendar, Activity, Bell, Compass } from "lucide-react";
 
 type Props = {
@@ -11,6 +12,8 @@ type Props = {
   isForecastOpen?: boolean;
   onToggleForecast?: () => void;
   onSelectNavOption?: (option: string) => void;
+  onSelectSearchCity: (city: string) => void;
+  currentCity?: string;
 };
 
 export default function Header({
@@ -20,13 +23,15 @@ export default function Header({
   isForecastOpen = false,
   onToggleForecast,
   onSelectNavOption,
+  onSelectSearchCity,
+  currentCity,
 }: Props) {
   const [settingsOpen, setSettingsOpen] = useState(false);
 
   return (
     <>
-      <header className="relative z-20 flex items-center justify-between px-6 md:px-10 py-5">
-        {/* Brand */}
+      <header className="relative z-20 flex flex-wrap items-center justify-between gap-4 px-6 md:px-10 py-4.5">
+        {/* Brand & Tagline */}
         <div className="flex items-center gap-3 text-white">
           <div className="w-10 h-10 rounded-2xl bg-black/70 backdrop-blur-xl border border-yellow-400/40 flex items-center justify-center shadow-lg text-yellow-400">
             <Cloud className="w-5 h-5 fill-yellow-400/20" />
@@ -42,11 +47,19 @@ export default function Header({
           </div>
         </div>
 
+        {/* Global City Search Bar */}
+        <div className="flex-1 max-w-sm order-3 sm:order-2">
+          <LocationSearchBar
+            onSelectCity={onSelectSearchCity}
+            currentCity={currentCity}
+          />
+        </div>
+
         {/* Center Nav Links / Action Cards */}
-        <nav className="hidden md:flex items-center gap-3 text-xs font-medium text-white/80 font-mono">
+        <nav className="hidden lg:flex items-center gap-2.5 text-xs font-medium text-white/80 font-mono order-2 sm:order-3">
           <button
             onClick={() => onSelectNavOption?.("overview")}
-            className="px-3.5 py-2 rounded-xl bg-black/60 border border-white/10 hover:border-yellow-400/30 text-gray-300 hover:text-white transition cursor-pointer flex items-center gap-1.5"
+            className="px-3 py-2 rounded-xl bg-black/60 border border-white/10 hover:border-yellow-400/30 text-gray-300 hover:text-white transition cursor-pointer flex items-center gap-1.5"
           >
             <Compass className="w-3.5 h-3.5 text-gray-400" />
             <span>Overview</span>
@@ -55,7 +68,7 @@ export default function Header({
           {/* Detailed Forecast Card (Toggle open/collapse) */}
           <button
             onClick={onToggleForecast}
-            className={`px-4 py-2 rounded-xl border transition-all cursor-pointer flex items-center gap-2 ${
+            className={`px-3.5 py-2 rounded-xl border transition-all cursor-pointer flex items-center gap-1.5 ${
               isForecastOpen
                 ? "bg-yellow-400 text-gray-950 border-yellow-400 shadow-lg shadow-yellow-400/20 font-bold"
                 : "bg-black/60 border-yellow-400/40 text-yellow-400 hover:bg-yellow-400/10"
@@ -67,7 +80,7 @@ export default function Header({
 
           <button
             onClick={() => onSelectNavOption?.("advisory")}
-            className="px-3.5 py-2 rounded-xl bg-black/60 border border-white/10 hover:border-yellow-400/30 text-gray-300 hover:text-white transition cursor-pointer flex items-center gap-1.5"
+            className="px-3 py-2 rounded-xl bg-black/60 border border-white/10 hover:border-yellow-400/30 text-gray-300 hover:text-white transition cursor-pointer flex items-center gap-1.5"
           >
             <Activity className="w-3.5 h-3.5 text-gray-400" />
             <span>Advisory</span>
@@ -75,7 +88,7 @@ export default function Header({
 
           <button
             onClick={() => onSelectNavOption?.("emergency")}
-            className="px-3.5 py-2 rounded-xl bg-black/60 border border-white/10 hover:border-yellow-400/30 text-gray-300 hover:text-white transition cursor-pointer flex items-center gap-1.5"
+            className="px-3 py-2 rounded-xl bg-black/60 border border-white/10 hover:border-yellow-400/30 text-gray-300 hover:text-white transition cursor-pointer flex items-center gap-1.5"
           >
             <Bell className="w-3.5 h-3.5 text-gray-400" />
             <span>Alerts</span>
@@ -83,10 +96,10 @@ export default function Header({
         </nav>
 
         {/* User Profile & Settings Trigger */}
-        <div className="flex items-center gap-3">
-          <div className="hidden sm:flex flex-col items-end text-right">
-            <span className="text-xs font-semibold text-white truncate max-w-[130px]">
-              {preferences.defaultLocation || "Live GPS"}
+        <div className="flex items-center gap-3 order-2 sm:order-4">
+          <div className="hidden md:flex flex-col items-end text-right">
+            <span className="text-xs font-semibold text-white truncate max-w-[120px]">
+              {currentCity || preferences.defaultLocation || "Live GPS"}
             </span>
             <span className="text-[10px] text-yellow-400 font-mono">
               {preferences.occupation || activeRole}

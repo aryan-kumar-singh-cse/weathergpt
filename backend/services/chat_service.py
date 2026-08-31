@@ -77,32 +77,42 @@ class ChatService:
     async def extract_intent(
         self,
         query: str,
-        language: str = "en"
+        language: str = "en",
+        history: Optional[List[Dict[str, str]]] = None
     ) -> Dict[str, Any]:
         """
-        Step 1: Extract intent and entities from natural language query.
+        Step 1: Extract intent and entities from natural language query with multi-turn memory.
         """
         logger.info(f"🔍 INTENT EXTRACTION START - Query: '{query}'")
 
         system_prompt = (
-            f"You are a weather query understanding system. "
+            f"You are a weather query understanding system with conversational context memory. "
             f"You detect the user's language, extract the location they're asking about, "
             f"and classify their intent. Output ONLY valid JSON.\n\n"
+            f"IMPORTANT CONVERSATIONAL RULES:\n"
+            f"- If the query is a follow-up (e.g. 'what about tomorrow?', 'will it rain then?', 'how cold is it there?'), "
+            f"extract the location discussed in previous conversation turns.\n"
+            f"- If the query asks to compare two places (e.g. 'compare it with London'), extract the target location.\n\n"
             f"Possible intents:\n"
             f"- current: asking about current conditions (temperature, rain, wind right now)\n"
-            f"- forecast: asking about future weather (tomorrow, this week, etc.)\n"
+            f"- forecast: asking about future weather (tomorrow, this week, 7-day, 15-day, etc.)\n"
             f"- risk_check: asking about weather warnings, alerts, or hazardous conditions\n"
             f"- historical: asking about past weather or climate patterns\n"
             f"- briefing: asking for a comprehensive weather summary\n\n"
-            f"If the query doesn't mention a specific location but asks about a state/region/country,\n"
-            f"set nationwide=true. Otherwise, extract the place name.\n\n"
             f"Return JSON format:\n"
             f'{{"place": "Mumbai", "language": "en", "intent": "forecast", "nationwide": false}}'
         )
 
+        history_context = ""
+        if history:
+            recent_turns = history[-6:]
+            history_context = "Previous Conversation Context:\n" + "\n".join(
+                [f"{h.get('sender') or h.get('role', 'user')}: {h.get('text') or h.get('content', '')}" for h in recent_turns]
+            ) + "\n\n"
+
         messages = [
             {"role": "system", "content": system_prompt},
-            {"role": "user", "content": query}
+            {"role": "user", "content": f"{history_context}Current User Query: {query}"}
         ]
 
         try:
@@ -132,7 +142,7 @@ class ChatService:
             
             # If LLM place is missing or generic, verify with fallback
             if not result.get("place") or result.get("place", "").lower() in ["india", "current", "here", "today", "now"]:
-                fallback_res = self._fallback_intent_extraction(query, language)
+                fallback_res = self._fallback_intent_extraction(query, language, history)
                 if fallback_res.get("place") and fallback_res.get("place") != "India":
                     result["place"] = fallback_res["place"]
                     result["nationwide"] = False
@@ -143,16 +153,16 @@ class ChatService:
         except (json.JSONDecodeError, KeyError, Exception) as e:
             logger.error(f"❌ Intent extraction failed with error: {type(e).__name__}: {str(e)}")
             logger.warning(f"⚠️ Falling back to natural language regex & keyword matching")
-            return self._fallback_intent_extraction(query, language)
+            return self._fallback_intent_extraction(query, language, history)
 
-    def _fallback_intent_extraction(self, query: str, language: str) -> Dict[str, Any]:
-        """Fallback intent extraction using NLP regex and multi-city dictionary."""
+    def _fallback_intent_extraction(self, query: str, language: str, history: Optional[List[Dict[str, str]]] = None) -> Dict[str, Any]:
+        """Fallback intent extraction using NLP regex, multi-city dictionary, and conversation history."""
         query_lower = query.lower().strip()
 
         # Intent detection
-        if any(kw in query_lower for kw in ["forecast", "tomorrow", "weekend", "next week", "predict", "upcoming", "7 day", "15 day"]):
+        if any(kw in query_lower for kw in ["forecast", "tomorrow", "weekend", "next week", "predict", "upcoming", "7 day", "15 day", "then", "later"]):
             intent = "forecast"
-        elif any(kw in query_lower for kw in ["alert", "warning", "danger", "storm", "cyclone", "risk", "rain chance"]):
+        elif any(kw in query_lower for kw in ["alert", "warning", "danger", "storm", "cyclone", "risk", "rain chance", "umbrella"]):
             intent = "risk_check"
         elif any(kw in query_lower for kw in ["historical", "past", "normal", "average", "trend"]):
             intent = "historical"
@@ -174,34 +184,46 @@ class ChatService:
             match = re.search(pat, query, re.IGNORECASE)
             if match:
                 candidate = match.group(1).strip()
-                # Exclude stop words
                 candidate_clean = re.sub(r'^(the|a|an|current|today|tomorrow)\s+', '', candidate, flags=re.IGNORECASE).strip()
-                if candidate_clean and candidate_clean.lower() not in ["weather", "forecast", "india", "here", "city", "place"]:
+                if candidate_clean and candidate_clean.lower() not in ["weather", "forecast", "india", "here", "city", "place", "there", "then"]:
                     place = candidate_clean.title()
                     break
 
-        # 2. Dictionary scan of common cities if regex didn't find one
+        # 2. Dictionary scan of common cities
+        known_cities = [
+            "ghaziabad", "noida", "greater noida", "gurgaon", "gurugram", "faridabad", "delhi", "new delhi",
+            "mumbai", "pune", "nagpur", "nashik", "aurangabad", "chhatrapati sambhajinagar",
+            "bangalore", "bengaluru", "mysore", "mysuru", "mangalore", "hubli",
+            "chennai", "coimbatore", "madurai", "salem", "trichy",
+            "hyderabad", "visakhapatnam", "vijayawada", "tirupati",
+            "kolkata", "howrah", "siliguri", "durgapur",
+            "ahmedabad", "surat", "vadodara", "rajkot",
+            "jaipur", "jodhpur", "udaipur", "kota", "bikaner", "ajmer",
+            "lucknow", "kanpur", "agra", "varanasi", "prayagraj", "allahabad", "meerut", "aligarh", "bareilly",
+            "patna", "gaya", "muzaffarpur", "ranchi", "jamshedpur", "dhanbad",
+            "bhopal", "indore", "gwalior", "jabalpur", "ujjain", "raipur", "bilaspur",
+            "chandigarh", "amritsar", "ludhiana", "jalandhar", "shimla", "manali", "dharamshala",
+            "dehradun", "haridwar", "rishikesh", "srinagar", "jammu", "guwahati", "shillong", "bhubaneswar", "cuttack",
+            "kochi", "trivandrum", "thiruvananthapuram", "kozhikode", "thrissur", "goa", "panaji",
+            "london", "paris", "new york", "tokyo", "dubai", "singapore", "sydney", "toronto"
+        ]
+
         if not place:
-            known_cities = [
-                "ghaziabad", "noida", "greater noida", "gurgaon", "gurugram", "faridabad", "delhi", "new delhi",
-                "mumbai", "pune", "nagpur", "nashik", "aurangabad", "chhatrapati sambhajinagar",
-                "bangalore", "bengaluru", "mysore", "mysuru", "mangalore", "hubli",
-                "chennai", "coimbatore", "madurai", "salem", "trichy",
-                "hyderabad", "visakhapatnam", "vijayawada", "tirupati",
-                "kolkata", "howrah", "siliguri", "durgapur",
-                "ahmedabad", "surat", "vadodara", "rajkot",
-                "jaipur", "jodhpur", "udaipur", "kota", "bikaner", "ajmer",
-                "lucknow", "kanpur", "agra", "varanasi", "prayagraj", "allahabad", "meerut", "aligarh", "bareilly",
-                "patna", "gaya", "muzaffarpur", "ranchi", "jamshedpur", "dhanbad",
-                "bhopal", "indore", "gwalior", "jabalpur", "ujjain", "raipur", "bilaspur",
-                "chandigarh", "amritsar", "ludhiana", "jalandhar", "shimla", "manali", "dharamshala",
-                "dehradun", "haridwar", "rishikesh", "srinagar", "jammu", "guwahati", "shillong", "bhubaneswar", "cuttack",
-                "kochi", "trivandrum", "thiruvananthapuram", "kozhikode", "thrissur", "goa", "panaji",
-                "london", "paris", "new york", "tokyo", "dubai", "singapore", "sydney", "toronto"
-            ]
             for city in known_cities:
                 if re.search(rf'\b{re.escape(city)}\b', query_lower):
                     place = city.title()
+                    break
+
+        # 3. Check conversation history for place if this is a follow-up query
+        if not place and history:
+            for h in reversed(history):
+                prev_text = (h.get("text") or h.get("content", "")).lower()
+                for city in known_cities:
+                    if re.search(rf'\b{re.escape(city)}\b', prev_text):
+                        place = city.title()
+                        logger.info(f"🔄 Resolved place from conversation history: {place}")
+                        break
+                if place:
                     break
 
         return {
@@ -216,25 +238,21 @@ class ChatService:
         """Detect if the query is a simple greeting or introduction."""
         query_lower = query.lower().strip()
 
-        # Simple greetings
         greetings = [
             'hi', 'hello', 'hey', 'hola', 'namaste', 'good morning', 'good afternoon',
             'good evening', 'greetings', 'howdy', 'sup', 'yo', 'hiya'
         ]
 
-        # Introduction queries
         intros = [
             'who are you', 'what are you', 'what can you do', 'help', 'what is this',
             'tell me about yourself', 'introduce yourself', 'your name'
         ]
 
-        # Check if query is just a greeting (with optional punctuation)
         clean_query = query_lower.rstrip('!?.,')
 
         if clean_query in greetings:
             return True
 
-        # Check if it's an introduction question
         for intro in intros:
             if intro in query_lower:
                 return True
@@ -248,10 +266,11 @@ class ChatService:
         weather_data: Dict[str, Any],
         role: str = "citizen",
         language: str = "en",
-        occupation: Optional[str] = None
+        occupation: Optional[str] = None,
+        history: Optional[List[Dict[str, str]]] = None
     ) -> str:
         """
-        Step 2: Generate grounded response using retrieved weather data.
+        Step 2: Generate grounded response using retrieved weather data and conversation history.
         """
         logger.info(f"🎯 RESPONSE GENERATION START - Query: '{query}'")
         logger.info(f"👤 Role: {role}, Occupation: {occupation}, Language: {language}")
@@ -269,10 +288,21 @@ class ChatService:
             language_prompt = f"\n\nRespond in {language}. Use weather terminology appropriate for that language."
 
         messages = [
-            {"role": "system", "content": role_prompt + language_prompt},
-            {"role": "user", "content": query},
-            {"role": "assistant", "content": f"Grounding data (do NOT invent values not present here):\n{grounding}"}
+            {"role": "system", "content": role_prompt + language_prompt}
         ]
+
+        # Inject previous multi-turn conversation history
+        if history:
+            for turn in history[-6:]:
+                role_name = "assistant" if (turn.get("sender") == "assistant" or turn.get("role") == "assistant") else "user"
+                turn_text = turn.get("text") or turn.get("content", "")
+                if turn_text:
+                    messages.append({"role": role_name, "content": turn_text})
+
+        messages.append({
+            "role": "user",
+            "content": f"{query}\n\n[Live Meteorological Grounding Context for this query]:\n{grounding}"
+        })
 
         try:
             logger.info("📞 Calling LLM for response generation...")

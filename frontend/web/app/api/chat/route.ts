@@ -21,7 +21,7 @@ function mapWeatherCodeToDescription(code: number): string {
 
 export async function POST(request: Request) {
   try {
-    const { message, occupation, language, location } = await request.json();
+    const { message, occupation, language, location, history } = await request.json();
 
     let role = "citizen";
     if (occupation?.toLowerCase().includes("farmer")) role = "farmer";
@@ -47,6 +47,7 @@ export async function POST(request: Request) {
             role,
             language: (language || "en").toLowerCase().slice(0, 2),
             location: location || undefined,
+            history: history || undefined,
           }),
         });
 

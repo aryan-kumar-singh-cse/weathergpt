@@ -5,7 +5,7 @@ Main conversational entrypoint - implements the three-layer query pipeline
 
 from fastapi import APIRouter, HTTPException, Header, Depends
 from pydantic import BaseModel
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 from datetime import datetime
 import logging
 from sqlalchemy.orm import Session
@@ -137,6 +137,7 @@ class AskRequest(BaseModel):
     location: Optional[str] = None
     location_hint: Optional[Dict[str, Any]] = None
     session_id: Optional[str] = None  # Optional session ID in body
+    history: Optional[List[Dict[str, Any]]] = None
 
 
 class AskResponse(BaseModel):
@@ -215,11 +216,12 @@ async def ask_weather_question(
         request.language = "en"
 
     try:
-        # Step 1: Extract intent + entities (LLM call #1)
+        # Step 1: Extract intent + entities (LLM call #1) with multi-turn memory
         logger.info(f"Processing query: '{request.query}' (role={request.role}, lang={request.language})")
         intent = await chat_service.extract_intent(
             request.query,
-            request.language
+            request.language,
+            history=request.history
         )
 
         # Step 2a: Geocode the place
@@ -270,7 +272,7 @@ async def ask_weather_question(
             weather_data["place_info"] = place_info
             severity = weather_service.classify_severity(weather_data)
 
-        # Step 3: Generate grounded response (LLM call #2)
+        # Step 3: Generate grounded response (LLM call #2) with conversation history
         combined_data = {
             **weather_data,
             "severity": severity,
@@ -283,7 +285,8 @@ async def ask_weather_question(
             weather_data=combined_data,
             role=request.role,
             language=request.language,
-            occupation=user.occupation
+            occupation=user.occupation,
+            history=request.history
         )
 
         # Build response

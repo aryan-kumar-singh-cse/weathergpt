@@ -14,6 +14,7 @@ import {
   CornerDownLeft,
   Bot,
   ChevronUp,
+  MapPin,
 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 
@@ -23,33 +24,38 @@ export type ChatMessage = {
   text: string;
   timestamp: string;
   role?: string;
+  city?: string;
 };
 
 type Props = {
-  onSend: (message: string) => void;
+  onSend: (message: string, history?: ChatMessage[]) => void;
   isLoading?: boolean;
   latestResponse?: string;
+  latestResponseCity?: string;
   role?: string;
-  city?: string;
+  currentDashboardCity?: string;
   isExpanded?: boolean;
   onToggleExpanded?: (expanded: boolean) => void;
+  onSwitchDashboardCity?: (city: string) => void;
 };
 
 const SUGGESTED_PROMPTS = [
   "Will it rain tomorrow?",
-  "What should I plan this week considering the weather?",
+  "How about next weekend?",
   "Farming advisory and irrigation timing",
-  "Aviation visibility and wind conditions",
+  "Compare current weather with London",
 ];
 
 export default function ChatInputBar({
   onSend,
   isLoading = false,
   latestResponse,
+  latestResponseCity,
   role = "General Public",
-  city = "Delhi",
+  currentDashboardCity = "Delhi",
   isExpanded: controlledExpanded,
   onToggleExpanded,
+  onSwitchDashboardCity,
 }: Props) {
   const [value, setValue] = useState("");
   const [isOpen, setIsOpen] = useState(true);
@@ -85,12 +91,13 @@ export default function ChatInputBar({
             text: latestResponse,
             timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
             role,
+            city: latestResponseCity,
           },
         ];
       });
       setExpanded(true);
     }
-  }, [latestResponse, role]);
+  }, [latestResponse, latestResponseCity, role]);
 
   // Auto scroll chat to bottom
   useEffect(() => {
@@ -103,22 +110,21 @@ export default function ChatInputBar({
     const query = (textToSend || value).trim();
     if (!query || isLoading) return;
 
-    setMessages((prev) => [
-      ...prev,
-      {
-        id: crypto.randomUUID(),
-        sender: "user",
-        text: query,
-        timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-      },
-    ]);
+    const userMsg: ChatMessage = {
+      id: crypto.randomUUID(),
+      sender: "user",
+      text: query,
+      timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+    };
 
+    const newMessages = [...messages, userMsg];
+    setMessages(newMessages);
     setExpanded(true);
-    onSend(query);
+    onSend(query, newMessages);
     setValue("");
   };
 
-  // Clear chat cleanly without breaking subsequent responses
+  // Clear chat cleanly without breaking state
   const handleClearChat = (e: React.MouseEvent) => {
     e.stopPropagation();
     setMessages([]);
@@ -193,10 +199,10 @@ export default function ChatInputBar({
               </div>
               <div>
                 <h3 className="text-xs font-bold font-mono tracking-tight text-white flex items-center gap-1.5">
-                  <span>WeatherGPT Intelligence</span>
+                  <span>WeatherGPT Conversational Intelligence</span>
                 </h3>
                 <p className="text-[10px] text-gray-400 font-mono">
-                  Grounding: <span className="text-yellow-400 font-semibold">{city}</span> • Role: {role}
+                  Context Aware • Main Dashboard: <span className="text-yellow-400 font-semibold">{currentDashboardCity}</span> • Role: {role}
                 </p>
               </div>
             </div>
@@ -232,8 +238,8 @@ export default function ChatInputBar({
                   <Bot className="w-5 h-5" />
                 </div>
                 <p className="text-xs text-gray-300 font-mono">
-                  Ask any meteorological, planning, or agricultural query for{" "}
-                  <span className="text-yellow-400 font-bold">{city}</span>.
+                  Ask any weather, agricultural, flight, or planning question.
+                  Multi-turn follow-ups (e.g. &quot;How about tomorrow?&quot;, &quot;What about rain then?&quot;) are supported!
                 </p>
 
                 {/* Suggested Prompt Chips */}
@@ -277,6 +283,24 @@ export default function ChatInputBar({
                     ) : (
                       <p className="font-mono text-xs md:text-sm font-medium text-white">{msg.text}</p>
                     )}
+
+                    {/* Action button if response discusses another city */}
+                    {msg.sender === "assistant" &&
+                      msg.city &&
+                      msg.city.toLowerCase() !== currentDashboardCity.toLowerCase() &&
+                      onSwitchDashboardCity && (
+                        <div className="mt-3 pt-2 border-t border-white/10 flex items-center justify-between">
+                          <span className="text-[10px] text-gray-400 font-mono">Location discussed: {msg.city}</span>
+                          <button
+                            onClick={() => onSwitchDashboardCity(msg.city!)}
+                            className="text-[10px] font-mono px-2.5 py-1 rounded-lg bg-yellow-400/15 hover:bg-yellow-400/30 border border-yellow-400/40 text-yellow-300 flex items-center gap-1 transition cursor-pointer"
+                          >
+                            <MapPin className="w-3 h-3 text-yellow-400" />
+                            <span>Show on Dashboard</span>
+                          </button>
+                        </div>
+                      )}
+
                     <span className="block text-[9px] text-gray-400 font-mono mt-2 text-right">
                       {msg.timestamp}
                     </span>
@@ -299,7 +323,7 @@ export default function ChatInputBar({
                 </div>
                 <div className="rounded-2xl rounded-bl-none p-3 bg-gray-950/80 border border-yellow-400/30 text-yellow-400 font-mono text-xs flex items-center gap-2">
                   <span className="inline-block w-2 h-2 rounded-full bg-yellow-400 animate-pulse" />
-                  <span>Synthesizing live meteorological intelligence for {city}...</span>
+                  <span>Synthesizing live meteorological response...</span>
                 </div>
               </div>
             )}
@@ -351,7 +375,7 @@ export default function ChatInputBar({
           placeholder={
             isListening
               ? "Listening to your voice..."
-              : `Ask WeatherGPT (e.g. 'Will it rain tomorrow in ${city}?')...`
+              : `Ask WeatherGPT (e.g. 'How is the weather in Tokyo?', 'Will it rain tomorrow?')...`
           }
           className="flex-1 bg-transparent text-white placeholder-gray-500
                      outline-none font-sans text-xs md:text-sm"
