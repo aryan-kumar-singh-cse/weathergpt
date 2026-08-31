@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import dynamic from "next/dynamic";
 import Header from "@/components/Header";
 import WeatherSummaryCard from "@/components/WeatherSummaryCard";
@@ -85,6 +85,10 @@ export default function Home() {
   const [isChatLoading, setIsChatLoading] = useState(false);
   const [isLocating, setIsLocating] = useState(false);
 
+  // Live Auto-Refresh & Background Polling State
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [lastSyncedSecondsAgo, setLastSyncedSecondsAgo] = useState(0);
+
   // Operational Modal States (SIH High Impact Features)
   const [isAdvisoryOpen, setIsAdvisoryOpen] = useState(false);
   const [isBulletinOpen, setIsBulletinOpen] = useState(false);
@@ -111,12 +115,18 @@ export default function Home() {
 
   // 1. Fetch & Update Main Dashboard Location (via Search Bar, GPS, or Settings)
   const handleSelectDashboardLocation = useCallback(
-    async (cityName: string, coords?: { lat: number; lng: number }) => {
+    async (cityName: string, coords?: { lat: number; lng: number }, isSilentSync = false) => {
       if (coords) {
         setGlobeCoords({ lat: coords.lat, lng: coords.lng });
       }
 
-      const toastId = toast.loading(`Loading weather data for ${cityName}...`);
+      let toastId: string | undefined;
+      if (!isSilentSync) {
+        toastId = toast.loading(`Loading weather data for ${cityName}...`);
+      } else {
+        setIsRefreshing(true);
+      }
+
       try {
         const res = await fetch("/api/chat", {
           method: "POST",
@@ -171,13 +181,42 @@ export default function Home() {
           }
         } catch {}
 
-        toast.success(`Dashboard viewing ${data.city || cityName}`, { id: toastId });
+        setLastSyncedSecondsAgo(0);
+        if (toastId) {
+          toast.success(`Dashboard viewing ${data.city || cityName}`, { id: toastId });
+        }
       } catch (err: any) {
-        toast.error(err?.message || "Failed to load weather report", { id: toastId });
+        if (toastId) {
+          toast.error(err?.message || "Failed to load weather report", { id: toastId });
+        }
+      } finally {
+        setIsRefreshing(false);
       }
     },
     [preferences, selectedLanguage]
   );
+
+  // Auto-Refresh Polling Engine (Every 2.5 minutes + 1s seconds counter)
+  useEffect(() => {
+    const counterTimer = setInterval(() => {
+      setLastSyncedSecondsAgo((prev) => prev + 1);
+    }, 1000);
+
+    const autoSyncTimer = setInterval(() => {
+      if (dashboardWeather.city) {
+        handleSelectDashboardLocation(
+          dashboardWeather.city,
+          { lat: dashboardWeather.lat, lng: dashboardWeather.lng },
+          true
+        );
+      }
+    }, 150000); // 2.5 minutes
+
+    return () => {
+      clearInterval(counterTimer);
+      clearInterval(autoSyncTimer);
+    };
+  }, [dashboardWeather.city, dashboardWeather.lat, dashboardWeather.lng, handleSelectDashboardLocation]);
 
   // 2. Conversational Multi-Turn Chat Handler (Decoupled from Dashboard)
   const handleChatSend = useCallback(
@@ -319,7 +358,7 @@ export default function Home() {
         />
       </div>
 
-      {/* Top Header with Global City Search Bar & Vernacular Language Switcher */}
+      {/* Top Header with Search Bar, Vernacular Switcher, Auto-Sync Engine & Quick Hubs */}
       <Header
         preferences={preferences}
         onSavePreferences={handleSavePreferences}
@@ -335,6 +374,15 @@ export default function Home() {
           setSelectedLanguage(lang);
           toast.success(`Language set to ${lang.toUpperCase()}`);
         }}
+        onManualRefresh={() => {
+          handleSelectDashboardLocation(
+            dashboardWeather.city,
+            { lat: dashboardWeather.lat, lng: dashboardWeather.lng },
+            false
+          );
+        }}
+        isRefreshing={isRefreshing}
+        lastSyncedSecondsAgo={lastSyncedSecondsAgo}
         onSelectNavOption={(opt) => {
           setIsChatExpanded(false);
           const loc = dashboardWeather.city;

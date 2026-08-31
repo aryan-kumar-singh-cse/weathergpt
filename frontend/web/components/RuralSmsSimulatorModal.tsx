@@ -9,6 +9,10 @@ import {
   CheckCircle2,
   Radio,
   Globe,
+  Share2,
+  Copy,
+  MessageSquare,
+  PhoneCall,
 } from "lucide-react";
 import { SupportedLanguage, LANGUAGE_OPTIONS, TRANSLATIONS } from "@/lib/translations";
 import { toast } from "react-hot-toast";
@@ -36,7 +40,7 @@ export default function RuralSmsSimulatorModal({
 }: Props) {
   const [phoneLanguage, setPhoneLanguage] = useState<SupportedLanguage>(lang === "en" ? "hi" : lang);
   const [phoneNumber, setPhoneNumber] = useState("+91 98765 43210");
-  const [isSent, setIsSent] = useState(false);
+  const [isCopied, setIsCopied] = useState(false);
 
   if (!isOpen) return null;
 
@@ -52,10 +56,53 @@ export default function RuralSmsSimulatorModal({
 
   const currentSms = smsTexts[phoneLanguage] || smsTexts.hi;
 
-  const handleSendSimulation = () => {
-    setIsSent(true);
-    toast.success(`Vernacular SMS dispatched to ${phoneNumber}!`);
-    setTimeout(() => setIsSent(false), 3000);
+  // Clean phone number (remove spaces, plus, hyphens for URL schemes)
+  const cleanPhone = phoneNumber.replace(/[^\d]/g, "");
+
+  // Real WhatsApp direct delivery to user's phone number
+  const handleRealWhatsAppSend = () => {
+    const waUrl = cleanPhone.length >= 10
+      ? `https://wa.me/${cleanPhone}?text=${encodeURIComponent(currentSms)}`
+      : `https://api.whatsapp.com/send?text=${encodeURIComponent(currentSms)}`;
+    window.open(waUrl, "_blank");
+    toast.success(`Opening WhatsApp alert for ${phoneNumber}!`);
+  };
+
+  // Real native SMS app direct trigger
+  const handleNativeSmsSend = () => {
+    const smsUrl = `sms:${cleanPhone || ""}?body=${encodeURIComponent(currentSms)}`;
+    window.location.href = smsUrl;
+    toast.success("Opening native SMS app on device!");
+  };
+
+  // Copy SMS content
+  const handleCopyText = () => {
+    navigator.clipboard.writeText(currentSms);
+    setIsCopied(true);
+    toast.success("Alert text copied to clipboard!");
+    setTimeout(() => setIsCopied(false), 2500);
+  };
+
+  // Spoken voice call simulation in vernacular
+  const handleSpeakVoiceAlert = () => {
+    if ("speechSynthesis" in window) {
+      window.speechSynthesis.cancel();
+      const utterance = new SpeechSynthesisUtterance(currentSms.replace(/\[.*?\]/g, ""));
+      const localeMap: Record<SupportedLanguage, string> = {
+        en: "en-IN",
+        hi: "hi-IN",
+        mr: "mr-IN",
+        ta: "ta-IN",
+        te: "te-IN",
+        bn: "bn-IN",
+        gu: "gu-IN",
+      };
+      utterance.lang = localeMap[phoneLanguage] || "hi-IN";
+      window.speechSynthesis.speak(utterance);
+      toast.success("Playing vernacular voice bulletin audio!");
+    } else {
+      toast.error("Audio synthesis not supported by this browser");
+    }
   };
 
   return (
@@ -69,10 +116,10 @@ export default function RuralSmsSimulatorModal({
             </div>
             <div>
               <h2 className="text-base font-bold text-white font-mono flex items-center gap-2">
-                <span>Rural 2G/3G SMS & Automated IVR Voice Simulator</span>
+                <span>Rural 2G/3G SMS & Automated IVR Voice Broadcast</span>
               </h2>
               <p className="text-xs text-yellow-400 font-mono">
-                Last-Mile Offline Connectivity for Feature Phones
+                Real-Time Dispatch to Farmer Mobile Numbers
               </p>
             </div>
           </div>
@@ -90,7 +137,7 @@ export default function RuralSmsSimulatorModal({
           {/* Vernacular Language Selector */}
           <div>
             <span className="text-[10px] text-gray-400 uppercase tracking-wider block mb-1.5">
-              Select Farmer&apos;s Native Language for SMS:
+              Select Farmer&apos;s Native Language for Alert:
             </span>
             <div className="flex flex-wrap gap-1.5">
               {LANGUAGE_OPTIONS.map((l) => (
@@ -116,32 +163,60 @@ export default function RuralSmsSimulatorModal({
               <span>12:00 PM 🔋</span>
             </div>
 
-            <div className="p-3.5 rounded-2xl bg-emerald-950/40 border border-emerald-500/30 text-emerald-200 text-xs whitespace-pre-line leading-relaxed shadow-inner">
+            <div className="p-3.5 rounded-2xl bg-emerald-950/40 border border-emerald-500/30 text-emerald-200 text-xs whitespace-pre-line leading-relaxed shadow-inner font-sans">
               {currentSms}
             </div>
 
             <div className="flex items-center justify-between text-[10px] text-gray-400 pt-1">
               <span>Chars: {currentSms.length}/160</span>
-              <span>SMS Standard</span>
+              <button
+                onClick={handleSpeakVoiceAlert}
+                className="flex items-center gap-1 text-yellow-400 hover:text-yellow-300 transition cursor-pointer font-bold"
+              >
+                <Volume2 className="w-3.5 h-3.5" />
+                <span>Hear Voice Alert</span>
+              </button>
             </div>
           </div>
 
-          {/* Action Trigger */}
-          <div className="flex items-center gap-2 pt-2">
+          {/* User Mobile Number Input */}
+          <div className="space-y-1.5">
+            <label className="text-[10px] text-gray-400 uppercase tracking-wider block">
+              Enter Your Real 10-Digit Mobile Number (or Farmer Number):
+            </label>
             <input
-              type="text"
+              type="tel"
               value={phoneNumber}
               onChange={(e) => setPhoneNumber(e.target.value)}
-              className="flex-1 px-3.5 py-2.5 rounded-xl bg-gray-900 border border-white/10 text-white font-mono text-xs focus:outline-none focus:border-yellow-400"
-              placeholder="+91 Phone number"
+              className="w-full px-3.5 py-2.5 rounded-xl bg-gray-900 border border-white/10 text-white font-mono text-xs focus:outline-none focus:border-yellow-400 placeholder:text-gray-600"
+              placeholder="+91 98765 43210"
             />
+          </div>
+
+          {/* Real Dispatch Action Buttons */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1">
+            <button
+              onClick={handleRealWhatsAppSend}
+              className="p-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-gray-950 font-extrabold font-mono text-xs flex items-center justify-center gap-1.5 transition cursor-pointer shadow-lg shadow-emerald-500/20"
+            >
+              <Share2 className="w-3.5 h-3.5" />
+              <span>Send WhatsApp</span>
+            </button>
 
             <button
-              onClick={handleSendSimulation}
-              className="px-4 py-2.5 rounded-xl bg-yellow-400 hover:bg-yellow-500 text-gray-950 font-bold font-mono text-xs flex items-center gap-1.5 transition cursor-pointer"
+              onClick={handleNativeSmsSend}
+              className="p-2.5 rounded-xl bg-yellow-400 hover:bg-yellow-500 text-gray-950 font-extrabold font-mono text-xs flex items-center justify-center gap-1.5 transition cursor-pointer shadow-lg shadow-yellow-400/20"
             >
-              <Send className="w-3.5 h-3.5" />
-              <span>{isSent ? "Dispatched!" : "Simulate Broadcast"}</span>
+              <MessageSquare className="w-3.5 h-3.5" />
+              <span>Send Native SMS</span>
+            </button>
+
+            <button
+              onClick={handleCopyText}
+              className="p-2.5 rounded-xl bg-gray-900 hover:bg-gray-800 border border-white/10 text-gray-200 font-mono text-xs flex items-center justify-center gap-1.5 transition cursor-pointer"
+            >
+              {isCopied ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+              <span>{isCopied ? "Copied!" : "Copy SMS"}</span>
             </button>
           </div>
         </div>
