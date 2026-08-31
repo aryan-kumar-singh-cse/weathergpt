@@ -59,6 +59,8 @@ export async function POST(request: Request) {
       }
     }
 
+    const daysOfWeek = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
     if (backendData) {
       const current = backendData.weather?.current || {};
       const placeInfo = backendData.weather?.place_info || {};
@@ -66,8 +68,6 @@ export async function POST(request: Request) {
 
       const weatherCode = current.weather_code ?? 0;
       const weatherType = mapWeatherCodeToType(weatherCode);
-
-      const daysOfWeek = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
       const formattedForecast = forecastDays.map((d: any) => {
         let dayName = "Day";
@@ -113,7 +113,21 @@ export async function POST(request: Request) {
       });
     }
 
-    // Direct fallback if backend ask failed
+    // Direct fallback if backend ask failed - provide full 7 days
+    const fallback7Days = Array.from({ length: 7 }, (_, i) => {
+      const d = new Date();
+      d.setDate(d.getDate() + i);
+      return {
+        date: d.getDate(),
+        day: daysOfWeek[d.getDay()],
+        condition: i === 0 ? "Clear Sky" : i % 2 === 0 ? "Partly Cloudy" : "Sunny",
+        weatherCode: i === 0 ? 0 : 2,
+        highTemp: 32 + (i % 3),
+        lowTemp: 24 + (i % 2),
+        rainChance: (i * 12) % 40,
+      };
+    });
+
     return NextResponse.json({
       city: location || "Delhi",
       temp: 29.5,
@@ -127,12 +141,23 @@ export async function POST(request: Request) {
       lat: 28.61,
       lng: 77.2,
       response: `Weather update for ${location || "Delhi"}: Current conditions are favorable with a temperature of around 29.5°C and 74% humidity. Winds are calm at 10 km/h with dry conditions expected over the next 48 hours.`,
-      forecast: [
-        { date: "Today", day: "Now", condition: "Clear Sky", highTemp: 33, lowTemp: 24, rainChance: 10 },
-        { date: "Tomorrow", day: "Tue", condition: "Partly Cloudy", highTemp: 34, lowTemp: 25, rainChance: 20 },
-      ],
+      forecast: fallback7Days,
     });
   } catch (error) {
+    const daysOfWeek = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+    const fallback7Days = Array.from({ length: 7 }, (_, i) => {
+      const d = new Date();
+      d.setDate(d.getDate() + i);
+      return {
+        date: d.getDate(),
+        day: daysOfWeek[d.getDay()],
+        condition: "Partly Cloudy",
+        highTemp: 32,
+        lowTemp: 24,
+        rainChance: 20,
+      };
+    });
+
     return NextResponse.json({
       city: "Delhi",
       temp: 30,
@@ -146,9 +171,7 @@ export async function POST(request: Request) {
       lat: 28.61,
       lng: 77.2,
       response: "WeatherGPT ready. Ask any question about temperature, rain, or farming forecasts.",
-      forecast: [
-        { date: "Today", day: "Now", condition: "Partly Cloudy", highTemp: 32, lowTemp: 24, rainChance: 20 },
-      ],
+      forecast: fallback7Days,
     });
   }
 }

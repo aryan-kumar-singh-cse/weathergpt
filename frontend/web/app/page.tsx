@@ -5,7 +5,6 @@ import dynamic from "next/dynamic";
 import Header from "@/components/Header";
 import WeatherSummaryCard from "@/components/WeatherSummaryCard";
 import InfoStrip from "@/components/InfoStrip";
-import ForecastStrip, { ForecastDay } from "@/components/ForecastStrip";
 import DetailedForecastPanel, { DetailedDay } from "@/components/DetailedForecastPanel";
 import ChatInputBar from "@/components/ChatInputBar";
 import { Preferences } from "@/components/SettingsPanel";
@@ -17,14 +16,24 @@ import { toast, Toaster } from "react-hot-toast";
 const WeatherGlobe = dynamic(() => import("@/components/WeatherGlobe"), {
   ssr: false,
   loading: () => (
-    <div className="absolute inset-0 bg-gradient-to-b from-[#0a0e2e] via-[#141a24] to-black" />
+    <div className="absolute inset-0 bg-gradient-to-b from-black via-gray-950 to-black" />
   ),
 });
 
 const gradients: Record<WeatherCondition, string> = {
-  clear: "from-[#0a0e2e] via-[#1a2456] to-[#2d3f7a]",
-  cloudy: "from-[#141a24] via-[#2a3442] to-[#3d4a5c]",
-  rainy: "from-black via-[#0d1218] to-[#1a2530]",
+  clear: "from-black via-[#0d1626] to-[#1a2538]",
+  cloudy: "from-black via-[#111822] to-[#1e2734]",
+  rainy: "from-black via-[#080d14] to-[#121922]",
+};
+
+type ForecastDay = {
+  date: number | string;
+  day: string;
+  condition?: string;
+  weatherCode?: number;
+  highTemp: number;
+  lowTemp?: number;
+  rainChance?: number;
 };
 
 type WeatherResult = {
@@ -47,9 +56,9 @@ export default function Home() {
   const [location, setLocation] = useState({ lat: 28.6139, lng: 77.209 });
   const [weatherCondition, setWeatherCondition] = useState<WeatherCondition>("clear");
   const [result, setResult] = useState<WeatherResult | null>(null);
-  const [outlook30Days, setOutlook30Days] = useState<ForecastDay[]>([]);
   const [detailedDays15, setDetailedDays15] = useState<DetailedDay[]>([]);
   const [isForecastOpen, setIsForecastOpen] = useState(false);
+  const [isChatExpanded, setIsChatExpanded] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isLocating, setIsLocating] = useState(false);
 
@@ -63,8 +72,6 @@ export default function Home() {
     async (message: string, prefsOverride?: Preferences, customLocation?: string) => {
       setIsLoading(true);
       const activePrefs = prefsOverride ?? preferences;
-
-      // Allow backend to parse any city typed in natural language, or use fallback
       const targetLoc = customLocation || undefined;
 
       try {
@@ -88,24 +95,11 @@ export default function Home() {
           setLocation({ lat: data.lat, lng: data.lng });
         }
 
-        // Fetch 30-day extended outlook for the forecast strip & detailed panel
+        // Fetch extended 15-day outlook for the detailed panel
         try {
           const outlookRes = await get30DayOutlook(data.lat, data.lng, data.city);
-          if (outlookRes?.days) {
-            const mapped30: ForecastDay[] = outlookRes.days.map((d: any) => {
-              const dt = new Date(d.date);
-              return {
-                date: dt.getDate(),
-                day: ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][dt.getDay()],
-                condition: d.precipitation_probability > 50 ? "Rain" : "Partly Cloudy",
-                highTemp: d.temperature_max,
-                lowTemp: d.temperature_min,
-                rainChance: d.precipitation_probability,
-              };
-            });
-            setOutlook30Days(mapped30);
-
-            const mappedDetailed: DetailedDay[] = outlookRes.days.map((d: any) => {
+          if (outlookRes?.days && outlookRes.days.length > 0) {
+            const mappedDetailed: DetailedDay[] = outlookRes.days.slice(0, 15).map((d: any) => {
               const dt = new Date(d.date);
               return {
                 date: `${dt.getDate()} ${dt.toLocaleString("default", { month: "short" })}`,
@@ -205,8 +199,23 @@ export default function Home() {
     rainChance: f.rainChance,
   }));
 
+  // Toggle Detailed Forecast Panel (auto-minimize chat when forecast opens)
+  const toggleDetailedForecast = () => {
+    setIsForecastOpen((prev) => {
+      const next = !prev;
+      if (next) setIsChatExpanded(false);
+      return next;
+    });
+  };
+
+  // Toggle Chat Drawer (auto-minimize forecast panel when chat opens)
+  const toggleChatDrawer = (expanded: boolean) => {
+    setIsChatExpanded(expanded);
+    if (expanded) setIsForecastOpen(false);
+  };
+
   return (
-    <main className="relative h-screen w-screen overflow-hidden select-none">
+    <main className="relative h-screen w-screen overflow-hidden select-none bg-black">
       <Toaster position="top-right" />
 
       {/* Dynamic Background Gradient & 3D Globe */}
@@ -226,11 +235,12 @@ export default function Home() {
         onSavePreferences={handleSavePreferences}
         activeRole={preferences.occupation}
         isForecastOpen={isForecastOpen}
-        onToggleForecast={() => setIsForecastOpen((prev) => !prev)}
+        onToggleForecast={toggleDetailedForecast}
         onSelectNavOption={(opt) => {
+          setIsChatExpanded(false);
           const loc = result?.city || preferences.defaultLocation || "Delhi";
           if (opt === "overview") handleSend(`Give me an overview of ${loc}`);
-          else if (opt === "forecast") setIsForecastOpen((prev) => !prev);
+          else if (opt === "forecast") toggleDetailedForecast();
           else if (opt === "advisory") handleSend(`Advisory recommendations for ${loc}`);
           else if (opt === "emergency") handleSend(`Are there any weather alerts for ${loc}?`);
         }}
@@ -249,22 +259,13 @@ export default function Home() {
         isLocating={isLocating}
       />
 
-      {/* Centered Frosted-Glass Info Strip */}
+      {/* Centered Frosted-Glass Info Strip (Only when forecast panel is closed) */}
       {result && !isForecastOpen && (
         <InfoStrip
           city={result.city}
           temp={result.temp}
           condition={result.condition}
           rainChance={result.rainChance}
-        />
-      )}
-
-      {/* Horizontal Frosted-Glass Forecast Strip */}
-      {result?.forecast && result.forecast.length > 0 && !isForecastOpen && (
-        <ForecastStrip
-          days={result.forecast}
-          outlook30Days={outlook30Days}
-          onOpenDetailed={() => setIsForecastOpen(true)}
         />
       )}
 
@@ -277,14 +278,16 @@ export default function Home() {
         days15={detailedDays15}
       />
 
-      {/* Floating Collapsible Chat Input Bar (Bottom-Center) */}
-      <div className="absolute bottom-6 md:bottom-8 left-1/2 -translate-x-1/2 z-20 w-[94%] max-w-2xl">
+      {/* Floating Collapsible Chat Input Bar with Manual Open Button */}
+      <div className="absolute bottom-6 md:bottom-8 left-1/2 -translate-x-1/2 z-30 w-[94%] max-w-2xl">
         <ChatInputBar
           onSend={(msg) => handleSend(msg)}
           isLoading={isLoading}
           latestResponse={result?.response}
           role={preferences.occupation}
           city={result?.city ?? preferences.defaultLocation ?? "Delhi"}
+          isExpanded={isChatExpanded}
+          onToggleExpanded={toggleChatDrawer}
         />
       </div>
     </main>

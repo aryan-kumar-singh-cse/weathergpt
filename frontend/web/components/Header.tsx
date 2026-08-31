@@ -28,26 +28,27 @@ export default function Header({
       <header className="relative z-20 flex items-center justify-between px-6 md:px-10 py-5">
         {/* Brand */}
         <div className="flex items-center gap-3 text-white">
-          <div className="w-10 h-10 rounded-2xl bg-white/10 backdrop-blur-xl border border-white/20 flex items-center justify-center shadow-lg text-white">
-            <Cloud className="w-5 h-5 text-white/90" />
+          <div className="w-10 h-10 rounded-2xl bg-black/70 backdrop-blur-xl border border-yellow-400/40 flex items-center justify-center shadow-lg text-yellow-400">
+            <Cloud className="w-5 h-5 fill-yellow-400/20" />
           </div>
           <div>
-            <span className="text-xl md:text-2xl font-extrabold tracking-tight bg-gradient-to-r from-white via-white/90 to-white/70 bg-clip-text text-transparent">
+            <span className="text-xl md:text-2xl font-extrabold tracking-tight bg-gradient-to-r from-yellow-300 via-yellow-400 to-white bg-clip-text text-transparent">
               WeatherGPT
             </span>
-            <div className="hidden sm:flex items-center gap-1.5 text-[10px] font-mono text-white/50">
+            <div className="hidden sm:flex items-center gap-1.5 text-[10px] font-mono text-gray-400">
+              <span className="text-yellow-400">•</span>
               <span>Meteorological Intelligence</span>
             </div>
           </div>
         </div>
 
         {/* Center Nav Links / Action Cards */}
-        <nav className="hidden md:flex items-center gap-4 text-xs font-medium text-white/80 font-mono">
+        <nav className="hidden md:flex items-center gap-3 text-xs font-medium text-white/80 font-mono">
           <button
             onClick={() => onSelectNavOption?.("overview")}
-            className="px-3.5 py-2 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 text-white/80 hover:text-white transition cursor-pointer flex items-center gap-1.5"
+            className="px-3.5 py-2 rounded-xl bg-black/60 border border-white/10 hover:border-yellow-400/30 text-gray-300 hover:text-white transition cursor-pointer flex items-center gap-1.5"
           >
-            <Compass className="w-3.5 h-3.5 text-white/70" />
+            <Compass className="w-3.5 h-3.5 text-gray-400" />
             <span>Overview</span>
           </button>
 
@@ -56,27 +57,27 @@ export default function Header({
             onClick={onToggleForecast}
             className={`px-4 py-2 rounded-xl border transition-all cursor-pointer flex items-center gap-2 ${
               isForecastOpen
-                ? "bg-white/25 border-white/40 text-white shadow-lg font-bold"
-                : "bg-white/10 border-white/20 text-white/90 hover:bg-white/15"
+                ? "bg-yellow-400 text-gray-950 border-yellow-400 shadow-lg shadow-yellow-400/20 font-bold"
+                : "bg-black/60 border-yellow-400/40 text-yellow-400 hover:bg-yellow-400/10"
             }`}
           >
-            <Calendar className="w-3.5 h-3.5 text-white" />
+            <Calendar className="w-3.5 h-3.5" />
             <span>Detailed Forecast</span>
           </button>
 
           <button
             onClick={() => onSelectNavOption?.("advisory")}
-            className="px-3.5 py-2 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 text-white/80 hover:text-white transition cursor-pointer flex items-center gap-1.5"
+            className="px-3.5 py-2 rounded-xl bg-black/60 border border-white/10 hover:border-yellow-400/30 text-gray-300 hover:text-white transition cursor-pointer flex items-center gap-1.5"
           >
-            <Activity className="w-3.5 h-3.5 text-white/70" />
+            <Activity className="w-3.5 h-3.5 text-gray-400" />
             <span>Advisory</span>
           </button>
 
           <button
             onClick={() => onSelectNavOption?.("emergency")}
-            className="px-3.5 py-2 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 text-white/80 hover:text-white transition cursor-pointer flex items-center gap-1.5"
+            className="px-3.5 py-2 rounded-xl bg-black/60 border border-white/10 hover:border-yellow-400/30 text-gray-300 hover:text-white transition cursor-pointer flex items-center gap-1.5"
           >
-            <Bell className="w-3.5 h-3.5 text-white/70" />
+            <Bell className="w-3.5 h-3.5 text-gray-400" />
             <span>Alerts</span>
           </button>
         </nav>
@@ -84,10 +85,10 @@ export default function Header({
         {/* User Profile & Settings Trigger */}
         <div className="flex items-center gap-3">
           <div className="hidden sm:flex flex-col items-end text-right">
-            <span className="text-xs font-semibold text-white/90 truncate max-w-[130px]">
+            <span className="text-xs font-semibold text-white truncate max-w-[130px]">
               {preferences.defaultLocation || "Live GPS"}
             </span>
-            <span className="text-[10px] text-white/60 font-mono">
+            <span className="text-[10px] text-yellow-400 font-mono">
               {preferences.occupation || activeRole}
             </span>
           </div>
@@ -95,9 +96,9 @@ export default function Header({
           <button
             onClick={() => setSettingsOpen(true)}
             aria-label="Profile and Settings"
-            className="w-10 h-10 md:w-11 md:h-11 rounded-full bg-white/10 backdrop-blur-xl border border-white/20 flex items-center justify-center text-white hover:bg-white/20 transition-all shadow-xl hover:scale-105 active:scale-95 cursor-pointer"
+            className="w-10 h-10 md:w-11 md:h-11 rounded-full bg-black/70 backdrop-blur-xl border border-yellow-400/30 flex items-center justify-center text-yellow-400 hover:bg-yellow-400/20 transition-all shadow-xl hover:scale-105 active:scale-95 cursor-pointer"
           >
-            <User className="w-5 h-5 text-white/90" />
+            <User className="w-5 h-5" />
           </button>
         </div>
       </header>

@@ -102,13 +102,14 @@ class AuthService:
         email = email.strip().lower()
         return db.query(AuthUser).filter(AuthUser.email == email).first()
 
-    def check_rate_limit(self, email: str, endpoint: str, db: Session) -> Tuple[bool, int, int]:
+    def check_rate_limit(self, email: str, endpoint: str = "/api/v1/ask", db: Session = None, max_requests: Optional[int] = None) -> Tuple[bool, int, int]:
         """
         Check if user has exceeded rate limit for the rolling 24h window.
         Returns: Tuple of (is_allowed, requests_made, requests_remaining)
         """
         email = email.strip().lower()
         window_start = datetime.utcnow() - timedelta(hours=ROLLING_WINDOW_HOURS)
+        limit = max_requests if max_requests is not None else MAX_QUESTIONS_PER_DAY
 
         request_count = db.query(func.count(UsageLog.id)).filter(
             UsageLog.email == email,
@@ -116,11 +117,11 @@ class AuthService:
             UsageLog.timestamp >= window_start
         ).scalar() or 0
 
-        requests_remaining = max(0, MAX_QUESTIONS_PER_DAY - request_count)
-        is_allowed = request_count < MAX_QUESTIONS_PER_DAY
+        requests_remaining = max(0, limit - request_count)
+        is_allowed = request_count < limit
 
         logger.info(
-            f"Rate limit check for {email}: {request_count}/{MAX_QUESTIONS_PER_DAY} "
+            f"Rate limit check for {email}: {request_count}/{limit} "
             f"requests in last {ROLLING_WINDOW_HOURS}h"
         )
 

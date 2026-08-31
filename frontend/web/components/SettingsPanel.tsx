@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { MapPin, Navigation, Check, X, Loader2 } from "lucide-react";
+import { MapPin, Navigation, X, Loader2 } from "lucide-react";
 import { reverseGeocode } from "@/lib/api";
 
 export type Preferences = {
@@ -90,28 +90,31 @@ export default function SettingsPanel({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-md p-4 animate-fade-in"
       onClick={onClose}
     >
       <div
-        className="w-full max-w-md rounded-2xl bg-gray-950/70 backdrop-blur-2xl
-                   border border-white/20 p-6 md:p-7 shadow-2xl text-white"
+        className="w-full max-w-md rounded-3xl bg-black/90 backdrop-blur-2xl
+                   border border-yellow-400/30 p-6 md:p-7 shadow-2xl shadow-black text-white"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between mb-6 pb-2 border-b border-white/10">
-          <h2 className="text-lg font-bold tracking-tight">Weather Intelligence Settings</h2>
+        <div className="flex items-center justify-between mb-6 pb-3 border-b border-yellow-400/20">
+          <h2 className="text-base md:text-lg font-bold text-white tracking-tight flex items-center gap-2">
+            <span className="text-yellow-400">•</span>
+            <span>Weather Intelligence Settings</span>
+          </h2>
           <button
             onClick={onClose}
-            className="text-white/50 hover:text-white transition p-1 cursor-pointer"
+            className="w-8 h-8 rounded-full bg-white/10 hover:bg-yellow-400/20 hover:text-yellow-400 flex items-center justify-center text-gray-400 transition cursor-pointer"
           >
-            <X className="w-5 h-5" />
+            <X className="w-4 h-4" />
           </button>
         </div>
 
-        <div className="space-y-4">
+        <div className="space-y-4 font-mono">
           {/* Default Location */}
           <div>
-            <label className="text-xs font-mono text-white/70">Default Location</label>
+            <label className="text-xs text-yellow-400/90 font-semibold">Default Location</label>
             <div className="flex gap-2 mt-1.5">
               <div className="relative flex-1">
                 <MapPin className="w-4 h-4 text-yellow-400 absolute left-3 top-1/2 -translate-y-1/2" />
@@ -121,17 +124,17 @@ export default function SettingsPanel({
                     setPrefs((p) => ({ ...p, defaultLocation: e.target.value }))
                   }
                   placeholder="e.g. Mumbai, Delhi, Bengaluru"
-                  className="w-full bg-white/5 border border-white/20 rounded-xl
-                             pl-9 pr-3 py-2.5 text-xs md:text-sm outline-none placeholder-white/40
-                             focus:border-yellow-400/50 transition-colors"
+                  className="w-full bg-gray-950/90 border border-yellow-400/30 rounded-xl
+                             pl-9 pr-3 py-2.5 text-xs md:text-sm outline-none placeholder-gray-500
+                             focus:border-yellow-400 transition-colors text-white"
                 />
               </div>
               <button
                 type="button"
                 onClick={useCurrentLocation}
                 disabled={locating}
-                className="text-xs px-3.5 py-2.5 rounded-xl bg-white/10 border border-white/20
-                           hover:bg-white/20 transition whitespace-nowrap flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                className="text-xs px-3.5 py-2.5 rounded-xl bg-yellow-400/15 border border-yellow-400/40 text-yellow-300
+                           hover:bg-yellow-400/25 transition whitespace-nowrap flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
               >
                 {locating ? (
                   <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -145,16 +148,16 @@ export default function SettingsPanel({
 
           {/* Preferred Language */}
           <div>
-            <label className="text-xs font-mono text-white/70">Preferred Language</label>
+            <label className="text-xs text-yellow-400/90 font-semibold">Preferred Language</label>
             <select
               value={prefs.language}
               onChange={(e) =>
                 setPrefs((p) => ({ ...p, language: e.target.value }))
               }
-              className="w-full mt-1.5 bg-gray-900/80 border border-white/20 rounded-xl px-3.5 py-2.5 text-xs md:text-sm outline-none text-white focus:border-yellow-400/50"
+              className="w-full mt-1.5 bg-gray-950/90 border border-yellow-400/30 rounded-xl px-3.5 py-2.5 text-xs md:text-sm outline-none text-white focus:border-yellow-400"
             >
               {LANGUAGES.map((l) => (
-                <option key={l} value={l} className="bg-gray-900 text-white">
+                <option key={l} value={l} className="bg-gray-950 text-white">
                   {l}
                 </option>
               ))}
@@ -163,16 +166,16 @@ export default function SettingsPanel({
 
           {/* Occupation / Persona */}
           <div>
-            <label className="text-xs font-mono text-white/70">Occupation / Role</label>
+            <label className="text-xs text-yellow-400/90 font-semibold">Occupation / Role</label>
             <select
               value={prefs.occupation}
               onChange={(e) =>
                 setPrefs((p) => ({ ...p, occupation: e.target.value }))
               }
-              className="w-full mt-1.5 bg-gray-900/80 border border-white/20 rounded-xl px-3.5 py-2.5 text-xs md:text-sm outline-none text-white focus:border-yellow-400/50"
+              className="w-full mt-1.5 bg-gray-950/90 border border-yellow-400/30 rounded-xl px-3.5 py-2.5 text-xs md:text-sm outline-none text-white focus:border-yellow-400"
             >
               {OCCUPATIONS.map((o) => (
-                <option key={o} value={o} className="bg-gray-900 text-white">
+                <option key={o} value={o} className="bg-gray-950 text-white">
                   {o}
                 </option>
               ))}
@@ -184,7 +187,7 @@ export default function SettingsPanel({
         <button
           onClick={handleSave}
           className="w-full mt-6 py-3 rounded-xl bg-yellow-400 hover:bg-yellow-500 text-gray-950
-                     font-bold text-xs md:text-sm transition-all shadow-lg hover:shadow-yellow-400/20 cursor-pointer"
+                     font-bold text-xs md:text-sm transition-all shadow-lg shadow-yellow-400/20 cursor-pointer font-mono"
         >
           Save Preferences
         </button>

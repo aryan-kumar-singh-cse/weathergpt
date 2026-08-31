@@ -13,6 +13,7 @@ import {
   Trash2,
   CornerDownLeft,
   Bot,
+  ChevronUp,
 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 
@@ -30,6 +31,8 @@ type Props = {
   latestResponse?: string;
   role?: string;
   city?: string;
+  isExpanded?: boolean;
+  onToggleExpanded?: (expanded: boolean) => void;
 };
 
 const SUGGESTED_PROMPTS = [
@@ -45,14 +48,26 @@ export default function ChatInputBar({
   latestResponse,
   role = "General Public",
   city = "Delhi",
+  isExpanded: controlledExpanded,
+  onToggleExpanded,
 }: Props) {
   const [value, setValue] = useState("");
   const [isOpen, setIsOpen] = useState(true);
-  const [isExpanded, setIsExpanded] = useState(false);
+  const [internalExpanded, setInternalExpanded] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
   const chatScrollRef = useRef<HTMLDivElement>(null);
+
+  // Controlled or internal expansion state
+  const isExpanded = controlledExpanded !== undefined ? controlledExpanded : internalExpanded;
+  const setExpanded = (exp: boolean) => {
+    if (onToggleExpanded) {
+      onToggleExpanded(exp);
+    } else {
+      setInternalExpanded(exp);
+    }
+  };
 
   // Sync latest response into conversation history and auto-expand chat
   useEffect(() => {
@@ -73,7 +88,7 @@ export default function ChatInputBar({
           },
         ];
       });
-      setIsExpanded(true);
+      setExpanded(true);
     }
   }, [latestResponse, role]);
 
@@ -98,9 +113,15 @@ export default function ChatInputBar({
       },
     ]);
 
-    setIsExpanded(true);
+    setExpanded(true);
     onSend(query);
     setValue("");
+  };
+
+  // Clear chat cleanly without breaking subsequent responses
+  const handleClearChat = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setMessages([]);
   };
 
   // Speech-to-Text Voice Recognition
@@ -141,15 +162,15 @@ export default function ChatInputBar({
         <button
           onClick={() => {
             setIsOpen(true);
-            setIsExpanded(true);
+            setExpanded(true);
             setTimeout(() => inputRef.current?.focus(), 100);
           }}
           aria-label="Open chat"
-          className="w-12 h-12 rounded-full bg-white/15 backdrop-blur-2xl
-                     border border-white/25 flex items-center justify-center
-                     text-white/90 hover:text-white hover:scale-105 active:scale-95 transition-all shadow-2xl cursor-pointer"
+          className="w-12 h-12 rounded-full bg-black/80 backdrop-blur-2xl
+                     border border-yellow-400/40 flex items-center justify-center
+                     text-yellow-400 hover:text-yellow-300 hover:scale-105 active:scale-95 transition-all shadow-2xl cursor-pointer"
         >
-          <MessageSquare className="w-5 h-5 text-white" />
+          <MessageSquare className="w-5 h-5 text-yellow-400" />
         </button>
       </div>
     );
@@ -160,22 +181,22 @@ export default function ChatInputBar({
       {/* Floating Chat History Modal / Drawer (Upward Expansion) */}
       {isExpanded && (
         <div
-          className="w-full max-h-[380px] md:max-h-[460px] flex flex-col rounded-3xl
-                     bg-gray-950/85 backdrop-blur-2xl border border-white/20
-                     shadow-2xl animate-fade-in overflow-hidden transition-all duration-300"
+          className="w-full max-h-[390px] md:max-h-[470px] flex flex-col rounded-3xl
+                     bg-black/90 backdrop-blur-2xl border border-yellow-400/30
+                     shadow-2xl shadow-black/90 animate-fade-in overflow-hidden transition-all duration-300"
         >
           {/* Header */}
-          <div className="flex items-center justify-between px-5 py-3.5 border-b border-white/10 bg-white/5">
+          <div className="flex items-center justify-between px-5 py-3.5 border-b border-yellow-400/20 bg-yellow-400/[0.04]">
             <div className="flex items-center gap-2.5">
-              <div className="w-7 h-7 rounded-full bg-white/15 border border-white/20 flex items-center justify-center text-white">
-                <Bot className="w-3.5 h-3.5" />
+              <div className="w-8 h-8 rounded-xl bg-yellow-400/20 border border-yellow-400/40 flex items-center justify-center text-yellow-400 shadow-sm">
+                <Bot className="w-4 h-4" />
               </div>
               <div>
-                <h3 className="text-xs font-bold font-mono tracking-tight text-white">
-                  WeatherGPT Intelligence
+                <h3 className="text-xs font-bold font-mono tracking-tight text-white flex items-center gap-1.5">
+                  <span>WeatherGPT Intelligence</span>
                 </h3>
-                <p className="text-[10px] text-white/50 font-mono">
-                  Grounding: {city} • Mode: {role}
+                <p className="text-[10px] text-gray-400 font-mono">
+                  Grounding: <span className="text-yellow-400 font-semibold">{city}</span> • Role: {role}
                 </p>
               </div>
             </div>
@@ -183,17 +204,17 @@ export default function ChatInputBar({
             <div className="flex items-center gap-1.5">
               {messages.length > 0 && (
                 <button
-                  onClick={() => setMessages([])}
-                  title="Clear conversation history"
-                  className="p-1.5 rounded-lg text-white/40 hover:text-white/80 hover:bg-white/10 transition cursor-pointer"
+                  onClick={handleClearChat}
+                  title="Clear chat conversation"
+                  className="p-1.5 rounded-lg text-gray-400 hover:text-red-400 hover:bg-white/10 transition cursor-pointer"
                 >
-                  <Trash2 className="w-3.5 h-3.5" />
+                  <Trash2 className="w-4 h-4" />
                 </button>
               )}
               <button
-                onClick={() => setIsExpanded(false)}
-                title="Minimize chat"
-                className="p-1.5 rounded-lg text-white/50 hover:text-white hover:bg-white/10 transition cursor-pointer"
+                onClick={() => setExpanded(false)}
+                title="Minimize chat drawer"
+                className="p-1.5 rounded-lg text-gray-400 hover:text-yellow-400 hover:bg-white/10 transition cursor-pointer"
               >
                 <ChevronDown className="w-4 h-4" />
               </button>
@@ -203,16 +224,16 @@ export default function ChatInputBar({
           {/* Messages Scroll Area */}
           <div
             ref={chatScrollRef}
-            className="flex-1 overflow-y-auto p-4 md:p-5 space-y-4 text-xs md:text-sm scrollbar-thin scrollbar-thumb-white/20"
+            className="flex-1 overflow-y-auto p-4 md:p-5 space-y-4 text-xs md:text-sm scrollbar-thin scrollbar-thumb-yellow-400/30"
           >
             {messages.length === 0 ? (
               <div className="text-center py-6 space-y-3">
-                <div className="w-10 h-10 mx-auto rounded-full bg-white/10 flex items-center justify-center text-white">
-                  <Bot className="w-5 h-5 text-white/90" />
+                <div className="w-10 h-10 mx-auto rounded-full bg-yellow-400/15 border border-yellow-400/30 flex items-center justify-center text-yellow-400">
+                  <Bot className="w-5 h-5" />
                 </div>
-                <p className="text-xs text-white/70 font-mono">
+                <p className="text-xs text-gray-300 font-mono">
                   Ask any meteorological, planning, or agricultural query for{" "}
-                  <span className="text-white font-bold">{city}</span>.
+                  <span className="text-yellow-400 font-bold">{city}</span>.
                 </p>
 
                 {/* Suggested Prompt Chips */}
@@ -221,7 +242,7 @@ export default function ChatInputBar({
                     <button
                       key={idx}
                       onClick={() => handleSubmit(prompt)}
-                      className="text-[11px] font-mono px-3 py-1.5 rounded-full bg-white/10 border border-white/15 text-white/80 hover:bg-white/20 hover:text-white transition cursor-pointer"
+                      className="text-[11px] font-mono px-3 py-1.5 rounded-full bg-black/50 border border-yellow-400/30 text-yellow-400/90 hover:bg-yellow-400/15 hover:text-yellow-300 transition cursor-pointer"
                     >
                       {prompt}
                     </button>
@@ -237,7 +258,7 @@ export default function ChatInputBar({
                   }`}
                 >
                   {msg.sender === "assistant" && (
-                    <div className="w-7 h-7 rounded-full bg-white/15 border border-white/20 flex items-center justify-center text-white shrink-0 mt-0.5">
+                    <div className="w-7 h-7 rounded-full bg-yellow-400/20 border border-yellow-400/40 flex items-center justify-center text-yellow-400 shrink-0 mt-0.5">
                       <Bot className="w-3.5 h-3.5" />
                     </div>
                   )}
@@ -245,24 +266,24 @@ export default function ChatInputBar({
                   <div
                     className={`max-w-[85%] rounded-2xl p-3.5 md:p-4 text-white shadow-md ${
                       msg.sender === "user"
-                        ? "bg-white/20 border border-white/30 text-white rounded-br-none ml-auto"
-                        : "bg-white/10 border border-white/15 rounded-bl-none"
+                        ? "bg-yellow-400/20 border border-yellow-400/40 text-yellow-50 rounded-br-none ml-auto"
+                        : "bg-gray-950/90 border border-white/15 rounded-bl-none"
                     }`}
                   >
                     {msg.sender === "assistant" ? (
-                      <div className="prose prose-invert prose-xs md:prose-sm max-w-none leading-relaxed space-y-2">
+                      <div className="prose prose-invert prose-xs md:prose-sm max-w-none leading-relaxed space-y-2 text-gray-200">
                         <ReactMarkdown>{msg.text}</ReactMarkdown>
                       </div>
                     ) : (
-                      <p className="font-mono text-xs md:text-sm font-medium">{msg.text}</p>
+                      <p className="font-mono text-xs md:text-sm font-medium text-white">{msg.text}</p>
                     )}
-                    <span className="block text-[9px] text-white/40 font-mono mt-2 text-right">
+                    <span className="block text-[9px] text-gray-400 font-mono mt-2 text-right">
                       {msg.timestamp}
                     </span>
                   </div>
 
                   {msg.sender === "user" && (
-                    <div className="w-7 h-7 rounded-full bg-white/15 border border-white/25 flex items-center justify-center text-white/80 shrink-0 mt-0.5">
+                    <div className="w-7 h-7 rounded-full bg-yellow-400/30 border border-yellow-400/50 flex items-center justify-center text-yellow-300 shrink-0 mt-0.5">
                       <User className="w-3.5 h-3.5" />
                     </div>
                   )}
@@ -273,11 +294,11 @@ export default function ChatInputBar({
             {/* Typing / Processing Indicator */}
             {isLoading && (
               <div className="flex gap-3 justify-start items-center">
-                <div className="w-7 h-7 rounded-full bg-white/15 border border-white/20 flex items-center justify-center text-white shrink-0">
+                <div className="w-7 h-7 rounded-full bg-yellow-400/20 border border-yellow-400/40 flex items-center justify-center text-yellow-400 shrink-0">
                   <Loader2 className="w-3.5 h-3.5 animate-spin" />
                 </div>
-                <div className="rounded-2xl rounded-bl-none p-3 bg-white/10 border border-white/15 text-white/70 font-mono text-xs flex items-center gap-2">
-                  <span className="inline-block w-2 h-2 rounded-full bg-white animate-pulse" />
+                <div className="rounded-2xl rounded-bl-none p-3 bg-gray-950/80 border border-yellow-400/30 text-yellow-400 font-mono text-xs flex items-center gap-2">
+                  <span className="inline-block w-2 h-2 rounded-full bg-yellow-400 animate-pulse" />
                   <span>Synthesizing live meteorological intelligence for {city}...</span>
                 </div>
               </div>
@@ -286,12 +307,26 @@ export default function ChatInputBar({
         </div>
       )}
 
-      {/* Main Pill Chat Input Bar */}
+      {/* Main Pill Chat Input Bar with Manual Chat Trigger */}
       <div
-        className="flex items-center gap-3 rounded-full
-                   bg-gray-950/70 backdrop-blur-2xl border border-white/20
-                   px-5 py-3 md:py-3.5 shadow-2xl w-full transition-all focus-within:border-white/40 focus-within:bg-gray-950/85"
+        className="flex items-center gap-2.5 rounded-full
+                   bg-black/85 backdrop-blur-2xl border border-yellow-400/30
+                   px-4 md:px-5 py-2.5 md:py-3 shadow-2xl shadow-black/80 w-full transition-all focus-within:border-yellow-400/60 focus-within:bg-black/95"
       >
+        {/* Manual Chat Drawer Toggle Button */}
+        <button
+          type="button"
+          onClick={() => setExpanded(!isExpanded)}
+          title={isExpanded ? "Collapse chat" : "Open chat conversation"}
+          className={`p-2 rounded-full transition-all cursor-pointer flex items-center justify-center ${
+            isExpanded
+              ? "bg-yellow-400/20 text-yellow-300 border border-yellow-400/40"
+              : "text-gray-400 hover:text-yellow-400 hover:bg-yellow-400/10"
+          }`}
+        >
+          <MessageSquare className="w-4 h-4" />
+        </button>
+
         {/* Voice Input Button */}
         <button
           type="button"
@@ -301,7 +336,7 @@ export default function ChatInputBar({
           className={`p-2 rounded-full transition-all cursor-pointer ${
             isListening
               ? "bg-red-500/30 text-red-300 animate-pulse"
-              : "text-white/60 hover:text-white hover:bg-white/10"
+              : "text-gray-400 hover:text-yellow-400 hover:bg-yellow-400/10"
           }`}
         >
           <Mic className="w-4 h-4" />
@@ -318,7 +353,7 @@ export default function ChatInputBar({
               ? "Listening to your voice..."
               : `Ask WeatherGPT (e.g. 'Will it rain tomorrow in ${city}?')...`
           }
-          className="flex-1 bg-transparent text-white placeholder-white/45
+          className="flex-1 bg-transparent text-white placeholder-gray-500
                      outline-none font-sans text-xs md:text-sm"
         />
 
@@ -328,12 +363,12 @@ export default function ChatInputBar({
           onClick={() => handleSubmit()}
           disabled={!value.trim() || isLoading}
           aria-label="Send query"
-          className="w-8 h-8 rounded-full bg-white/20 hover:bg-white/30 disabled:opacity-40 disabled:hover:bg-white/20 text-white flex items-center justify-center transition-all hover:scale-105 active:scale-95 cursor-pointer shrink-0"
+          className="w-9 h-9 rounded-full bg-yellow-400 hover:bg-yellow-500 disabled:opacity-40 disabled:hover:bg-yellow-400 text-gray-950 font-bold flex items-center justify-center transition-all hover:scale-105 active:scale-95 cursor-pointer shrink-0 shadow-md shadow-yellow-400/20"
         >
           {isLoading ? (
-            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+            <Loader2 className="w-4 h-4 animate-spin text-gray-950" />
           ) : (
-            <CornerDownLeft className="w-3.5 h-3.5 stroke-[2.5]" />
+            <CornerDownLeft className="w-4 h-4 stroke-[2.5]" />
           )}
         </button>
 
@@ -342,7 +377,7 @@ export default function ChatInputBar({
           type="button"
           onClick={() => setIsOpen(false)}
           aria-label="Hide chat bar"
-          className="text-white/40 hover:text-white transition text-xs p-1 cursor-pointer"
+          className="text-gray-500 hover:text-white transition text-xs p-1 cursor-pointer"
         >
           <X className="w-4 h-4" />
         </button>

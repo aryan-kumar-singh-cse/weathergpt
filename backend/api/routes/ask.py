@@ -182,11 +182,13 @@ async def ask_weather_question(
             db=db
         )
 
-    # Check rate limit (20 requests per rolling 24h window)
+    # Check rate limit (1000/day for default web users, standard limit for others)
+    max_questions = 1000 if request.email.endswith("@weathergpt.local") else settings.MAX_QUESTIONS_PER_DAY
     is_allowed, requests_made, requests_remaining = auth_service.check_rate_limit(
         email=request.email,
         endpoint="/api/v1/ask",
-        db=db
+        db=db,
+        max_requests=max_questions
     )
 
     if not is_allowed:
