@@ -64,13 +64,13 @@ type DashboardWeather = {
 export default function Home() {
   // Main Dashboard Weather State
   const [dashboardWeather, setDashboardWeather] = useState<DashboardWeather>({
-    city: "Delhi",
-    temp: 30,
-    feelsLike: 32,
+    city: "",
+    temp: 28,
+    feelsLike: 30,
     humidity: 68,
     windSpeed: 10,
     pressure: 1012,
-    condition: "Partly Cloudy",
+    condition: "Clear Sky",
     rainChance: 15,
     weatherType: "clear",
     lat: 28.6139,
@@ -108,17 +108,29 @@ export default function Home() {
   const [chatResponseCity, setChatResponseCity] = useState<string | undefined>(undefined);
 
   const [preferences, setPreferences] = useState<Preferences>({
-    defaultLocation: "Delhi",
+    defaultLocation: "",
     language: "English",
     occupation: "General Public",
   });
 
   // 1. Fetch & Update Main Dashboard Location (via Search Bar, GPS, or Settings)
   const handleSelectDashboardLocation = useCallback(
-    async (cityName: string, coords?: { lat: number; lng: number }, isSilentSync = false) => {
+    async (cityName: string, coords?: { lat: number; lng: number }, isSilentSync = false, customLang?: SupportedLanguage) => {
+      if (!cityName) return;
+
+      const activeLang = customLang || selectedLanguage;
+
       if (coords) {
         setGlobeCoords({ lat: coords.lat, lng: coords.lng });
       }
+
+      // Persist active city and coordinates in localStorage so refresh never resets to Delhi!
+      try {
+        localStorage.setItem("weathergpt_active_city", cityName);
+        if (coords) {
+          localStorage.setItem("weathergpt_active_coords", JSON.stringify(coords));
+        }
+      } catch {}
 
       let toastId: string | undefined;
       if (!isSilentSync) {
@@ -134,7 +146,7 @@ export default function Home() {
           body: JSON.stringify({
             message: `Weather overview for ${cityName}`,
             occupation: preferences.occupation,
-            language: selectedLanguage,
+            language: activeLang,
             location: cityName,
           }),
         });
@@ -142,9 +154,12 @@ export default function Home() {
         if (!res.ok) throw new Error("Could not fetch location weather");
         const data = await res.json();
 
+        const resolvedLat = data.lat ?? coords?.lat ?? 28.61;
+        const resolvedLng = data.lng ?? coords?.lng ?? 77.2;
+
         setDashboardWeather({
           city: data.city || cityName,
-          temp: data.temp ?? 30,
+          temp: data.temp ?? 28,
           feelsLike: data.feelsLike,
           humidity: data.humidity,
           windSpeed: data.windSpeed,
@@ -152,8 +167,8 @@ export default function Home() {
           condition: data.condition || "Clear Sky",
           rainChance: data.rainChance,
           weatherType: data.weatherType || "clear",
-          lat: data.lat ?? coords?.lat ?? 28.61,
-          lng: data.lng ?? coords?.lng ?? 77.2,
+          lat: resolvedLat,
+          lng: resolvedLng,
           forecast: data.forecast || [],
         });
 
@@ -163,7 +178,7 @@ export default function Home() {
 
         // Fetch 15-day extended outlook for detailed window
         try {
-          const outlookRes = await get30DayOutlook(data.lat, data.lng, data.city);
+          const outlookRes = await get30DayOutlook(resolvedLat, resolvedLng, data.city || cityName);
           if (outlookRes?.days && outlookRes.days.length > 0) {
             const mappedDetailed: DetailedDay[] = outlookRes.days.slice(0, 15).map((d: any) => {
               const dt = new Date(d.date);
@@ -193,7 +208,7 @@ export default function Home() {
         setIsRefreshing(false);
       }
     },
-    [preferences, selectedLanguage]
+    [preferences.occupation, selectedLanguage]
   );
 
   // Auto-Refresh Polling Engine (Every 2.5 minutes + 1s seconds counter)
@@ -236,7 +251,7 @@ export default function Home() {
             message,
             occupation: preferences.occupation,
             language: selectedLanguage,
-            location: dashboardWeather.city,
+            location: dashboardWeather.city || "Live Location",
             history: formattedHistory,
           }),
         });
@@ -255,53 +270,61 @@ export default function Home() {
     [preferences, selectedLanguage, dashboardWeather.city]
   );
 
-  // 3. Live GPS Geolocation Trigger
-  const handleGPSDetect = useCallback(() => {
+  // 3. Live GPS Geolocation Trigger (Silent on mount, toast when manual)
+  const handleGPSDetect = useCallback((isManual = true) => {
     if (!navigator.geolocation) {
-      toast.error("Geolocation is not supported by your browser");
+      if (isManual) toast.error("Geolocation is not supported by your browser");
       return;
     }
 
     setIsLocating(true);
-    const toastId = toast.loading("Detecting your exact GPS location...");
+    let toastId: string | undefined;
+    if (isManual) {
+      toastId = toast.loading("Detecting your exact GPS location...");
+    }
 
     navigator.geolocation.getCurrentPosition(
       async (pos) => {
         try {
           const { latitude, longitude } = pos.coords;
           const geo = await reverseGeocode(latitude, longitude);
-          const detectedCity = geo.city || "Delhi";
+          const detectedCity = geo.city || "Ghaziabad";
 
           setPreferences((prev) => ({ ...prev, defaultLocation: detectedCity }));
-          toast.success(`Located in ${detectedCity}`, { id: toastId });
+          if (toastId) toast.success(`Located in ${detectedCity}`, { id: toastId });
 
           handleSelectDashboardLocation(detectedCity, { lat: latitude, lng: longitude });
         } catch {
-          toast.error("Could not reverse geocode GPS location", { id: toastId });
+          if (toastId) toast.error("Could not reverse geocode GPS location", { id: toastId });
         } finally {
           setIsLocating(false);
         }
       },
       () => {
         setIsLocating(false);
-        toast.error("Location permission denied", { id: toastId });
+        if (toastId) toast.error("Location permission denied", { id: toastId });
       },
       { enableHighAccuracy: true, timeout: 10000 }
     );
   }, [handleSelectDashboardLocation]);
 
-  // Initial Load: User Preferences & Default Dashboard City
+  // Initial Load: Priority to User's Saved Location / GPS instead of resetting to Delhi!
   useEffect(() => {
-    fetch("/api/user/preferences")
-      .then((res) => res.json())
-      .then((data: Preferences) => {
-        setPreferences(data);
-        const initialCity = data.defaultLocation || "Delhi";
-        handleSelectDashboardLocation(initialCity);
-      })
-      .catch(() => {
-        handleSelectDashboardLocation("Delhi");
-      });
+    let savedCity = "";
+    let savedCoords: { lat: number; lng: number } | undefined;
+
+    try {
+      savedCity = localStorage.getItem("weathergpt_active_city") || "";
+      const coordsStr = localStorage.getItem("weathergpt_active_coords");
+      if (coordsStr) savedCoords = JSON.parse(coordsStr);
+    } catch {}
+
+    if (savedCity) {
+      handleSelectDashboardLocation(savedCity, savedCoords);
+    } else {
+      // If no cached city, auto-detect user's real location via GPS
+      handleGPSDetect(false);
+    }
   }, []);
 
   const handleSavePreferences = async (prefs: Preferences) => {
@@ -358,7 +381,7 @@ export default function Home() {
         />
       </div>
 
-      {/* Top Header with Search Bar, Vernacular Switcher, Auto-Sync Engine & Quick Hubs */}
+      {/* Top Header with Clean Layout, Global Search & Vernacular Language Switcher */}
       <Header
         preferences={preferences}
         onSavePreferences={handleSavePreferences}
@@ -367,25 +390,35 @@ export default function Home() {
         onToggleForecast={toggleDetailedForecast}
         onSelectSearchCity={(city, coords) => handleSelectDashboardLocation(city, coords)}
         currentCity={dashboardWeather.city}
-        onUseCurrentLocation={handleGPSDetect}
+        onUseCurrentLocation={() => handleGPSDetect(true)}
         isLocating={isLocating}
         selectedLanguage={selectedLanguage}
         onSelectLanguage={(lang) => {
           setSelectedLanguage(lang);
           toast.success(`Language set to ${lang.toUpperCase()}`);
+          if (dashboardWeather.city) {
+            handleSelectDashboardLocation(
+              dashboardWeather.city,
+              { lat: dashboardWeather.lat, lng: dashboardWeather.lng },
+              false,
+              lang
+            );
+          }
         }}
         onManualRefresh={() => {
-          handleSelectDashboardLocation(
-            dashboardWeather.city,
-            { lat: dashboardWeather.lat, lng: dashboardWeather.lng },
-            false
-          );
+          if (dashboardWeather.city) {
+            handleSelectDashboardLocation(
+              dashboardWeather.city,
+              { lat: dashboardWeather.lat, lng: dashboardWeather.lng },
+              false
+            );
+          }
         }}
         isRefreshing={isRefreshing}
         lastSyncedSecondsAgo={lastSyncedSecondsAgo}
         onSelectNavOption={(opt) => {
           setIsChatExpanded(false);
-          const loc = dashboardWeather.city;
+          const loc = dashboardWeather.city || "your location";
           if (opt === "overview") handleChatSend(`Detailed overview of ${loc}`);
           else if (opt === "advisory") setIsAdvisoryOpen(true);
           else if (opt === "radar") setIsRadarOpen(true);
@@ -404,7 +437,7 @@ export default function Home() {
         humidity={dashboardWeather.humidity}
         windSpeed={dashboardWeather.windSpeed}
         pressure={dashboardWeather.pressure}
-        onRefreshGPS={handleGPSDetect}
+        onRefreshGPS={() => handleGPSDetect(true)}
         isLocating={isLocating}
         onOpenLightning={() => setIsLightningOpen(true)}
         onOpenCropGDD={() => setIsCropGDDOpen(true)}
@@ -414,7 +447,7 @@ export default function Home() {
       />
 
       {/* Centered Frosted-Glass Info Strip (Only when forecast panel and chat drawer are closed) */}
-      {!isForecastOpen && !isChatExpanded && (
+      {!isForecastOpen && !isChatExpanded && dashboardWeather.city && (
         <InfoStrip
           city={dashboardWeather.city}
           temp={dashboardWeather.temp}
@@ -483,7 +516,7 @@ export default function Home() {
         lang={selectedLanguage}
       />
 
-      {/* ⚡ DAMINI Lightning Strike & Nowcasting Proximity Sensor Modal */}
+      {/* ⚡ DAMINI Lightning Strike & Convective Nowcasting Risk Analyzer Modal */}
       <LightningProximityModal
         isOpen={isLightningOpen}
         onClose={() => setIsLightningOpen(false)}
@@ -492,6 +525,8 @@ export default function Home() {
         lng={dashboardWeather.lng}
         condition={dashboardWeather.condition}
         rainChance={dashboardWeather.rainChance}
+        temp={dashboardWeather.temp}
+        humidity={dashboardWeather.humidity}
         lang={selectedLanguage}
       />
 
@@ -506,13 +541,15 @@ export default function Home() {
         lang={selectedLanguage}
       />
 
-      {/* 🛰️ ISRO INSAT-3DR Geostationary Satellite Feed Modal */}
+      {/* 🛰️ ISRO INSAT-3DR Geostationary Cloud & Synoptic Satellite Feed Modal */}
       <SatelliteViewerModal
         isOpen={isSatelliteOpen}
         onClose={() => setIsSatelliteOpen(false)}
         city={dashboardWeather.city}
         lat={dashboardWeather.lat}
         lng={dashboardWeather.lng}
+        condition={dashboardWeather.condition}
+        rainChance={dashboardWeather.rainChance}
         lang={selectedLanguage}
       />
 
@@ -527,7 +564,7 @@ export default function Home() {
         lang={selectedLanguage}
       />
 
-      {/* 📲 Rural 2G/3G SMS & Automated IVR Voice Simulator Modal */}
+      {/* 📲 Rural 2G/3G SMS & Automated IVR Voice Broadcast Modal */}
       <RuralSmsSimulatorModal
         isOpen={isSmsOpen}
         onClose={() => setIsSmsOpen(false)}
