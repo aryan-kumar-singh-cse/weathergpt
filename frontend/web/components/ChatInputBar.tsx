@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
 import {
   Send,
   MessageSquare,
@@ -15,6 +15,14 @@ import {
   Bot,
   ChevronUp,
   MapPin,
+  Volume2,
+  VolumeX,
+  Copy,
+  Check,
+  Zap,
+  CloudRain,
+  Wind,
+  Calendar,
 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 
@@ -39,12 +47,39 @@ type Props = {
   onSwitchDashboardCity?: (city: string) => void;
 };
 
-const SUGGESTED_PROMPTS = [
-  "Will it rain tomorrow?",
-  "How about next weekend?",
-  "Farming advisory and irrigation timing",
-  "Compare current weather with London",
-];
+function getRoleBasedPrompts(role: string): string[] {
+  const r = (role || "").toLowerCase();
+  if (r.includes("farmer")) {
+    return [
+      "Next 5 days rainfall & soil moisture",
+      "Is it safe to spray pesticides tomorrow?",
+      "Irrigation scheduling & dry spell forecast",
+      "Temperature risk for sowing crops",
+    ];
+  }
+  if (r.includes("pilot")) {
+    return [
+      "Wind shear, turbulence & cloud ceiling",
+      "Aviation visibility & crosswind runway status",
+      "Thunderstorm & icing alert along flight paths",
+      "METAR & pressure altimeter briefing",
+    ];
+  }
+  if (r.includes("disaster")) {
+    return [
+      "Flash flood & inundation risk analysis",
+      "Cyclone path, wind speed & surge alert",
+      "Heavy rainfall danger zones",
+      "Emergency evacuation advisory",
+    ];
+  }
+  return [
+    "Will it rain in the next 3 hours?",
+    "Hourly temperature & humidity trend",
+    "Should I carry an umbrella today?",
+    "Compare weather with London",
+  ];
+}
 
 export default function ChatInputBar({
   onSend,
@@ -62,10 +97,12 @@ export default function ChatInputBar({
   const [internalExpanded, setInternalExpanded] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [speakingMessageId, setSpeakingMessageId] = useState<string | null>(null);
+  const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
+
   const inputRef = useRef<HTMLInputElement>(null);
   const chatScrollRef = useRef<HTMLDivElement>(null);
 
-  // Controlled or internal expansion state
   const isExpanded = controlledExpanded !== undefined ? controlledExpanded : internalExpanded;
   const setExpanded = (exp: boolean) => {
     if (onToggleExpanded) {
@@ -106,6 +143,40 @@ export default function ChatInputBar({
     }
   }, [messages, isExpanded, isLoading]);
 
+  // Text-To-Speech (TTS) Voice Reader
+  const toggleSpeech = useCallback((msgId: string, text: string) => {
+    if (!("speechSynthesis" in window)) {
+      alert("Text-to-speech is not supported in this browser.");
+      return;
+    }
+
+    if (speakingMessageId === msgId) {
+      window.speechSynthesis.cancel();
+      setSpeakingMessageId(null);
+      return;
+    }
+
+    window.speechSynthesis.cancel();
+    // Clean markdown symbols for cleaner speech
+    const cleanText = text.replace(/[*#_`>]/g, "").replace(/\[.*?\]\(.*?\)/g, "");
+    const utterance = new SpeechSynthesisUtterance(cleanText);
+    utterance.rate = 1.0;
+    utterance.pitch = 1.0;
+
+    utterance.onend = () => setSpeakingMessageId(null);
+    utterance.onerror = () => setSpeakingMessageId(null);
+
+    setSpeakingMessageId(msgId);
+    window.speechSynthesis.speak(utterance);
+  }, [speakingMessageId]);
+
+  // Copy message to clipboard
+  const handleCopy = (msgId: string, text: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedMessageId(msgId);
+    setTimeout(() => setCopiedMessageId(null), 2000);
+  };
+
   const handleSubmit = (textToSend?: string) => {
     const query = (textToSend || value).trim();
     if (!query || isLoading) return;
@@ -124,9 +195,10 @@ export default function ChatInputBar({
     setValue("");
   };
 
-  // Clear chat cleanly without breaking state
   const handleClearChat = (e: React.MouseEvent) => {
     e.stopPropagation();
+    window.speechSynthesis?.cancel();
+    setSpeakingMessageId(null);
     setMessages([]);
   };
 
@@ -162,6 +234,8 @@ export default function ChatInputBar({
     }
   };
 
+  const dynamicPrompts = getRoleBasedPrompts(role);
+
   if (!isOpen) {
     return (
       <div className="flex flex-col items-center gap-2">
@@ -187,9 +261,9 @@ export default function ChatInputBar({
       {/* Floating Chat History Modal / Drawer (Upward Expansion) */}
       {isExpanded && (
         <div
-          className="w-full max-h-[390px] md:max-h-[470px] flex flex-col rounded-3xl
-                     bg-black/90 backdrop-blur-2xl border border-yellow-400/30
-                     shadow-2xl shadow-black/90 animate-fade-in overflow-hidden transition-all duration-300"
+          className="w-full max-h-[410px] md:max-h-[500px] flex flex-col rounded-3xl
+                     bg-black/95 backdrop-blur-3xl border border-yellow-400/35
+                     shadow-2xl shadow-black/95 animate-fade-in overflow-hidden transition-all duration-300"
         >
           {/* Header */}
           <div className="flex items-center justify-between px-5 py-3.5 border-b border-yellow-400/20 bg-yellow-400/[0.04]">
@@ -202,7 +276,7 @@ export default function ChatInputBar({
                   <span>WeatherGPT Conversational Intelligence</span>
                 </h3>
                 <p className="text-[10px] text-gray-400 font-mono">
-                  Context Aware • Main Dashboard: <span className="text-yellow-400 font-semibold">{currentDashboardCity}</span> • Role: {role}
+                  District & City Aware • Main: <span className="text-yellow-400 font-semibold">{currentDashboardCity}</span> • Role: {role}
                 </p>
               </div>
             </div>
@@ -211,14 +285,18 @@ export default function ChatInputBar({
               {messages.length > 0 && (
                 <button
                   onClick={handleClearChat}
-                  title="Clear chat conversation"
+                  title="Clear conversation"
                   className="p-1.5 rounded-lg text-gray-400 hover:text-red-400 hover:bg-white/10 transition cursor-pointer"
                 >
                   <Trash2 className="w-4 h-4" />
                 </button>
               )}
               <button
-                onClick={() => setExpanded(false)}
+                onClick={() => {
+                  window.speechSynthesis?.cancel();
+                  setSpeakingMessageId(null);
+                  setExpanded(false);
+                }}
                 title="Minimize chat drawer"
                 className="p-1.5 rounded-lg text-gray-400 hover:text-yellow-400 hover:bg-white/10 transition cursor-pointer"
               >
@@ -237,20 +315,21 @@ export default function ChatInputBar({
                 <div className="w-10 h-10 mx-auto rounded-full bg-yellow-400/15 border border-yellow-400/30 flex items-center justify-center text-yellow-400">
                   <Bot className="w-5 h-5" />
                 </div>
-                <p className="text-xs text-gray-300 font-mono">
-                  Ask any weather, agricultural, flight, or planning question.
-                  Multi-turn follow-ups (e.g. &quot;How about tomorrow?&quot;, &quot;What about rain then?&quot;) are supported!
+                <p className="text-xs text-gray-300 font-mono max-w-md mx-auto">
+                  Ask any question about districts, cities, rain timings, crop advisory, flight conditions, or alerts.
+                  Follow-ups remember previous context automatically.
                 </p>
 
-                {/* Suggested Prompt Chips */}
-                <div className="flex flex-wrap justify-center gap-2 pt-2">
-                  {SUGGESTED_PROMPTS.map((prompt, idx) => (
+                {/* Role-tailored Suggested Prompt Chips */}
+                <div className="flex flex-wrap justify-center gap-2 pt-2 max-w-xl mx-auto">
+                  {dynamicPrompts.map((prompt, idx) => (
                     <button
                       key={idx}
                       onClick={() => handleSubmit(prompt)}
-                      className="text-[11px] font-mono px-3 py-1.5 rounded-full bg-black/50 border border-yellow-400/30 text-yellow-400/90 hover:bg-yellow-400/15 hover:text-yellow-300 transition cursor-pointer"
+                      className="text-[11px] font-mono px-3 py-1.5 rounded-full bg-black/60 border border-yellow-400/35 text-yellow-300 hover:bg-yellow-400/20 hover:text-yellow-200 transition cursor-pointer flex items-center gap-1.5"
                     >
-                      {prompt}
+                      <Zap className="w-3 h-3 text-yellow-400 shrink-0" />
+                      <span>{prompt}</span>
                     </button>
                   ))}
                 </div>
@@ -270,7 +349,7 @@ export default function ChatInputBar({
                   )}
 
                   <div
-                    className={`max-w-[85%] rounded-2xl p-3.5 md:p-4 text-white shadow-md ${
+                    className={`max-w-[88%] rounded-2xl p-3.5 md:p-4 text-white shadow-md ${
                       msg.sender === "user"
                         ? "bg-yellow-400/20 border border-yellow-400/40 text-yellow-50 rounded-br-none ml-auto"
                         : "bg-gray-950/90 border border-white/15 rounded-bl-none"
@@ -284,24 +363,69 @@ export default function ChatInputBar({
                       <p className="font-mono text-xs md:text-sm font-medium text-white">{msg.text}</p>
                     )}
 
-                    {/* Action button if response discusses another city */}
-                    {msg.sender === "assistant" &&
-                      msg.city &&
-                      msg.city.toLowerCase() !== currentDashboardCity.toLowerCase() &&
-                      onSwitchDashboardCity && (
-                        <div className="mt-3 pt-2 border-t border-white/10 flex items-center justify-between">
-                          <span className="text-[10px] text-gray-400 font-mono">Location discussed: {msg.city}</span>
+                    {/* Bot Message Toolbar: Read Aloud, Copy, Action Chips */}
+                    {msg.sender === "assistant" && (
+                      <div className="mt-3 pt-2.5 border-t border-white/10 flex flex-wrap items-center justify-between gap-2">
+                        <div className="flex items-center gap-1.5">
+                          {/* TTS Audio Speak Button */}
                           <button
-                            onClick={() => onSwitchDashboardCity(msg.city!)}
-                            className="text-[10px] font-mono px-2.5 py-1 rounded-lg bg-yellow-400/15 hover:bg-yellow-400/30 border border-yellow-400/40 text-yellow-300 flex items-center gap-1 transition cursor-pointer"
+                            onClick={() => toggleSpeech(msg.id, msg.text)}
+                            title={speakingMessageId === msg.id ? "Stop voice audio" : "Listen to weather audio"}
+                            className={`p-1.5 rounded-lg border transition cursor-pointer flex items-center gap-1 text-[10px] font-mono ${
+                              speakingMessageId === msg.id
+                                ? "bg-yellow-400 text-gray-950 border-yellow-400 font-bold"
+                                : "bg-black/40 border-white/10 text-gray-300 hover:text-yellow-400 hover:border-yellow-400/40"
+                            }`}
                           >
-                            <MapPin className="w-3 h-3 text-yellow-400" />
-                            <span>Show on Dashboard</span>
+                            {speakingMessageId === msg.id ? (
+                              <>
+                                <VolumeX className="w-3.5 h-3.5" />
+                                <span>Stop</span>
+                              </>
+                            ) : (
+                              <>
+                                <Volume2 className="w-3.5 h-3.5 text-yellow-400" />
+                                <span>Listen</span>
+                              </>
+                            )}
+                          </button>
+
+                          {/* Copy Button */}
+                          <button
+                            onClick={() => handleCopy(msg.id, msg.text)}
+                            title="Copy response"
+                            className="p-1.5 rounded-lg bg-black/40 border border-white/10 text-gray-300 hover:text-yellow-400 hover:border-yellow-400/40 transition cursor-pointer flex items-center gap-1 text-[10px] font-mono"
+                          >
+                            {copiedMessageId === msg.id ? (
+                              <>
+                                <Check className="w-3.5 h-3.5 text-green-400" />
+                                <span className="text-green-400">Copied</span>
+                              </>
+                            ) : (
+                              <>
+                                <Copy className="w-3.5 h-3.5" />
+                                <span>Copy</span>
+                              </>
+                            )}
                           </button>
                         </div>
-                      )}
 
-                    <span className="block text-[9px] text-gray-400 font-mono mt-2 text-right">
+                        {/* Action chip if response discusses another location */}
+                        {msg.city &&
+                          msg.city.toLowerCase() !== currentDashboardCity.toLowerCase() &&
+                          onSwitchDashboardCity && (
+                            <button
+                              onClick={() => onSwitchDashboardCity(msg.city!)}
+                              className="text-[10px] font-mono px-2.5 py-1 rounded-lg bg-yellow-400/15 hover:bg-yellow-400/30 border border-yellow-400/40 text-yellow-300 flex items-center gap-1 transition cursor-pointer"
+                            >
+                              <MapPin className="w-3 h-3 text-yellow-400" />
+                              <span>Show {msg.city} on Dashboard</span>
+                            </button>
+                          )}
+                      </div>
+                    )}
+
+                    <span className="block text-[9px] text-gray-500 font-mono mt-1.5 text-right">
                       {msg.timestamp}
                     </span>
                   </div>
@@ -323,15 +447,43 @@ export default function ChatInputBar({
                 </div>
                 <div className="rounded-2xl rounded-bl-none p-3 bg-gray-950/80 border border-yellow-400/30 text-yellow-400 font-mono text-xs flex items-center gap-2">
                   <span className="inline-block w-2 h-2 rounded-full bg-yellow-400 animate-pulse" />
-                  <span>Synthesizing live meteorological response...</span>
+                  <span>Synthesizing live meteorological analysis...</span>
                 </div>
               </div>
             )}
           </div>
+
+          {/* Quick Context Action Pills Bar at bottom of drawer */}
+          {messages.length > 0 && !isLoading && (
+            <div className="px-4 py-2 border-t border-white/10 bg-black/60 flex items-center gap-1.5 overflow-x-auto scrollbar-none">
+              <span className="text-[10px] font-mono text-gray-400 shrink-0">Quick follow-up:</span>
+              <button
+                onClick={() => handleSubmit("Will it rain in the next few hours?")}
+                className="text-[10px] font-mono px-2.5 py-1 rounded-lg bg-gray-900 border border-white/10 hover:border-yellow-400/40 text-gray-200 hover:text-yellow-300 transition shrink-0 flex items-center gap-1"
+              >
+                <CloudRain className="w-3 h-3 text-cyan-400" />
+                <span>Rain Forecast</span>
+              </button>
+              <button
+                onClick={() => handleSubmit("What about the wind speed and direction?")}
+                className="text-[10px] font-mono px-2.5 py-1 rounded-lg bg-gray-900 border border-white/10 hover:border-yellow-400/40 text-gray-200 hover:text-yellow-300 transition shrink-0 flex items-center gap-1"
+              >
+                <Wind className="w-3 h-3 text-yellow-400" />
+                <span>Wind Details</span>
+              </button>
+              <button
+                onClick={() => handleSubmit("Give me a 7-day weather trend summary")}
+                className="text-[10px] font-mono px-2.5 py-1 rounded-lg bg-gray-900 border border-white/10 hover:border-yellow-400/40 text-gray-200 hover:text-yellow-300 transition shrink-0 flex items-center gap-1"
+              >
+                <Calendar className="w-3 h-3 text-emerald-400" />
+                <span>7-Day Trend</span>
+              </button>
+            </div>
+          )}
         </div>
       )}
 
-      {/* Main Pill Chat Input Bar with Manual Chat Trigger */}
+      {/* Main Pill Chat Input Bar */}
       <div
         className="flex items-center gap-2.5 rounded-full
                    bg-black/85 backdrop-blur-2xl border border-yellow-400/30
@@ -375,7 +527,7 @@ export default function ChatInputBar({
           placeholder={
             isListening
               ? "Listening to your voice..."
-              : `Ask WeatherGPT (e.g. 'How is the weather in Tokyo?', 'Will it rain tomorrow?')...`
+              : `Ask anything (e.g. 'Weather in Wayanad district', 'Will it rain tomorrow?')...`
           }
           className="flex-1 bg-transparent text-white placeholder-gray-500
                      outline-none font-sans text-xs md:text-sm"
@@ -399,7 +551,11 @@ export default function ChatInputBar({
         {/* Collapse Button */}
         <button
           type="button"
-          onClick={() => setIsOpen(false)}
+          onClick={() => {
+            window.speechSynthesis?.cancel();
+            setSpeakingMessageId(null);
+            setIsOpen(false);
+          }}
           aria-label="Hide chat bar"
           className="text-gray-500 hover:text-white transition text-xs p-1 cursor-pointer"
         >

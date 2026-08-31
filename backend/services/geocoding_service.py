@@ -4,6 +4,7 @@ Geocoding and location resolution using Nominatim
 """
 
 import logging
+import re
 from typing import Dict, Any, Tuple, Optional
 import httpx
 
@@ -17,15 +18,15 @@ class GeocodingError(Exception):
 
 class GeocodingService:
     """
-    Geocoding service using Nominatim (OpenStreetMap).
-    Converts place names to coordinates.
+    Geocoding service using Nominatim (OpenStreetMap) and Open-Meteo geocoding.
+    Converts place and district names to coordinates.
     """
 
     def __init__(self):
         self.base_url = "https://nominatim.openstreetmap.org/search"
         self.timeout = 10.0
 
-        # Common Indian & Global city coordinates (fallback for fast resolution/offline)
+        # Common Indian & Global city/district coordinates (fallback for fast resolution/offline)
         self._fallback_cities = {
             "mumbai": (19.0760, 72.8777, "Maharashtra"),
             "delhi": (28.7041, 77.1025, "Delhi"),
@@ -95,6 +96,48 @@ class GeocodingService:
             "mysore": (12.2958, 76.6394, "Karnataka"),
             "mysuru": (12.2958, 76.6394, "Karnataka"),
             "mangalore": (12.9141, 74.8560, "Karnataka"),
+            # Key Districts across Indian States
+            "wayanad": (11.6854, 76.1320, "Kerala"),
+            "kutch": (23.7337, 69.8597, "Gujarat"),
+            "bastar": (19.0760, 82.0298, "Chhattisgarh"),
+            "thane": (19.2183, 72.9781, "Maharashtra"),
+            "gorakhpur": (26.7606, 83.3732, "Uttar Pradesh"),
+            "aligarh": (27.8974, 78.0880, "Uttar Pradesh"),
+            "bareilly": (28.3670, 79.4304, "Uttar Pradesh"),
+            "moradabad": (28.8386, 78.7733, "Uttar Pradesh"),
+            "jhansi": (25.4484, 78.5685, "Uttar Pradesh"),
+            "mathura": (27.4924, 77.6737, "Uttar Pradesh"),
+            "ayodhya": (26.7922, 82.1998, "Uttar Pradesh"),
+            "muzaffarnagar": (29.4727, 77.7085, "Uttar Pradesh"),
+            "alwar": (27.5530, 76.6346, "Rajasthan"),
+            "bikaner": (28.0229, 73.3119, "Rajasthan"),
+            "sikar": (27.6094, 75.1398, "Rajasthan"),
+            "barmer": (25.7521, 71.3967, "Rajasthan"),
+            "jaisalmer": (26.9157, 70.9083, "Rajasthan"),
+            "belagavi": (15.8497, 74.4977, "Karnataka"),
+            "ballari": (15.1394, 76.9214, "Karnataka"),
+            "tumakuru": (13.3379, 77.1173, "Karnataka"),
+            "udupi": (13.3409, 74.7421, "Karnataka"),
+            "shivamogga": (13.9299, 75.5681, "Karnataka"),
+            "tirunelveli": (8.7139, 77.7567, "Tamil Nadu"),
+            "tiruchirappalli": (10.7905, 78.7047, "Tamil Nadu"),
+            "ernakulam": (9.9816, 76.2999, "Kerala"),
+            "palakkad": (10.7867, 76.6548, "Kerala"),
+            "thrissur": (10.5276, 76.2144, "Kerala"),
+            "malappuram": (11.0510, 76.0711, "Kerala"),
+            "kollam": (8.8932, 76.6141, "Kerala"),
+            "alappuzha": (9.4981, 76.3388, "Kerala"),
+            "idukki": (9.8494, 76.9804, "Kerala"),
+            "kannur": (11.8745, 75.3704, "Kerala"),
+            "kasaragod": (12.5102, 74.9852, "Kerala"),
+            "kottayam": (9.5916, 76.5222, "Kerala"),
+            "leh": (34.1526, 77.5771, "Ladakh"),
+            "ladakh": (34.1526, 77.5771, "Ladakh"),
+            "muzaffarpur": (26.1209, 85.3647, "Bihar"),
+            "gaya": (24.7914, 85.0002, "Bihar"),
+            "bhagalpur": (25.2425, 86.9842, "Bihar"),
+            "darbhanga": (26.1542, 85.8918, "Bihar"),
+            "purnia": (25.7771, 87.4753, "Bihar"),
             # Global Metros
             "london": (51.5074, -0.1278, "United Kingdom"),
             "paris": (48.8566, 2.3522, "France"),
@@ -108,9 +151,9 @@ class GeocodingService:
 
     async def geocode(self, place_name: str, country: str = "India") -> Dict[str, Any]:
         """
-        Geocode a place name to coordinates.
+        Geocode a place or district name to coordinates.
         """
-        clean_name = place_name.strip()
+        clean_name = re.sub(r'\b(district|dist|zila|tehsil|city|town|region)\b', '', place_name, flags=re.IGNORECASE).strip() or place_name.strip()
         normalized = clean_name.lower()
 
         # Check fallback cache first
