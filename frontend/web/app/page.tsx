@@ -11,6 +11,11 @@ import SectorAdvisoryModal from "@/components/SectorAdvisoryModal";
 import WeatherBulletinExportModal from "@/components/WeatherBulletinExportModal";
 import ClimateBenchmarkModal from "@/components/ClimateBenchmarkModal";
 import WeatherRadarModal from "@/components/WeatherRadarModal";
+import LightningProximityModal from "@/components/LightningProximityModal";
+import SmartCropCalendarModal from "@/components/SmartCropCalendarModal";
+import SatelliteViewerModal from "@/components/SatelliteViewerModal";
+import DisasterReliefModal from "@/components/DisasterReliefModal";
+import RuralSmsSimulatorModal from "@/components/RuralSmsSimulatorModal";
 import { Preferences } from "@/components/SettingsPanel";
 import type { WeatherCondition } from "@/components/WeatherGlobe";
 import { SupportedLanguage, TRANSLATIONS } from "@/lib/translations";
@@ -85,6 +90,11 @@ export default function Home() {
   const [isBulletinOpen, setIsBulletinOpen] = useState(false);
   const [isClimateOpen, setIsClimateOpen] = useState(false);
   const [isRadarOpen, setIsRadarOpen] = useState(false);
+  const [isLightningOpen, setIsLightningOpen] = useState(false);
+  const [isCropGDDOpen, setIsCropGDDOpen] = useState(false);
+  const [isSatelliteOpen, setIsSatelliteOpen] = useState(false);
+  const [isDisasterOpen, setIsDisasterOpen] = useState(false);
+  const [isSmsOpen, setIsSmsOpen] = useState(false);
 
   // Vernacular Multi-Lingual State
   const [selectedLanguage, setSelectedLanguage] = useState<SupportedLanguage>("en");
@@ -337,7 +347,7 @@ export default function Home() {
         }}
       />
 
-      {/* Persistent Main Dashboard Weather Summary Card (Top-Left) */}
+      {/* Persistent Main Dashboard Weather Summary Card (Top-Left with Sensor Quick Triggers) */}
       <WeatherSummaryCard
         city={dashboardWeather.city}
         temp={dashboardWeather.temp}
@@ -348,10 +358,15 @@ export default function Home() {
         pressure={dashboardWeather.pressure}
         onRefreshGPS={handleGPSDetect}
         isLocating={isLocating}
+        onOpenLightning={() => setIsLightningOpen(true)}
+        onOpenCropGDD={() => setIsCropGDDOpen(true)}
+        onOpenSatellite={() => setIsSatelliteOpen(true)}
+        onOpenDisaster={() => setIsDisasterOpen(true)}
+        onOpenSms={() => setIsSmsOpen(true)}
       />
 
-      {/* Centered Frosted-Glass Info Strip (Only when forecast panel is closed) */}
-      {!isForecastOpen && (
+      {/* Centered Frosted-Glass Info Strip (Only when forecast panel and chat drawer are closed) */}
+      {!isForecastOpen && !isChatExpanded && (
         <InfoStrip
           city={dashboardWeather.city}
           temp={dashboardWeather.temp}
@@ -417,6 +432,62 @@ export default function Home() {
         city={dashboardWeather.city}
         lat={dashboardWeather.lat}
         lng={dashboardWeather.lng}
+        lang={selectedLanguage}
+      />
+
+      {/* ⚡ DAMINI Lightning Strike & Nowcasting Proximity Sensor Modal */}
+      <LightningProximityModal
+        isOpen={isLightningOpen}
+        onClose={() => setIsLightningOpen(false)}
+        city={dashboardWeather.city}
+        lat={dashboardWeather.lat}
+        lng={dashboardWeather.lng}
+        condition={dashboardWeather.condition}
+        rainChance={dashboardWeather.rainChance}
+        lang={selectedLanguage}
+      />
+
+      {/* 🌾 Krishi Vigyan Kendra Crop Phenology & GDD Engine Modal */}
+      <SmartCropCalendarModal
+        isOpen={isCropGDDOpen}
+        onClose={() => setIsCropGDDOpen(false)}
+        city={dashboardWeather.city}
+        temp={dashboardWeather.temp}
+        humidity={dashboardWeather.humidity}
+        rainChance={dashboardWeather.rainChance}
+        lang={selectedLanguage}
+      />
+
+      {/* 🛰️ ISRO INSAT-3DR Geostationary Satellite Feed Modal */}
+      <SatelliteViewerModal
+        isOpen={isSatelliteOpen}
+        onClose={() => setIsSatelliteOpen(false)}
+        city={dashboardWeather.city}
+        lat={dashboardWeather.lat}
+        lng={dashboardWeather.lng}
+        lang={selectedLanguage}
+      />
+
+      {/* 🚨 NDMA Multi-Hazard Disaster & Relief Camp Hub Modal */}
+      <DisasterReliefModal
+        isOpen={isDisasterOpen}
+        onClose={() => setIsDisasterOpen(false)}
+        city={dashboardWeather.city}
+        temp={dashboardWeather.temp}
+        rainChance={dashboardWeather.rainChance}
+        windSpeed={dashboardWeather.windSpeed}
+        lang={selectedLanguage}
+      />
+
+      {/* 📲 Rural 2G/3G SMS & Automated IVR Voice Simulator Modal */}
+      <RuralSmsSimulatorModal
+        isOpen={isSmsOpen}
+        onClose={() => setIsSmsOpen(false)}
+        city={dashboardWeather.city}
+        temp={dashboardWeather.temp}
+        condition={dashboardWeather.condition}
+        rainChance={dashboardWeather.rainChance}
+        windSpeed={dashboardWeather.windSpeed}
         lang={selectedLanguage}
       />
 
