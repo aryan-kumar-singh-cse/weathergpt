@@ -12,8 +12,10 @@ type Props = {
   isForecastOpen?: boolean;
   onToggleForecast?: () => void;
   onSelectNavOption?: (option: string) => void;
-  onSelectSearchCity: (city: string) => void;
+  onSelectSearchCity: (city: string, coords?: { lat: number; lng: number }) => void;
   currentCity?: string;
+  onUseCurrentLocation?: () => void;
+  isLocating?: boolean;
 };
 
 export default function Header({
@@ -25,6 +27,8 @@ export default function Header({
   onSelectNavOption,
   onSelectSearchCity,
   currentCity,
+  onUseCurrentLocation,
+  isLocating,
 }: Props) {
   const [settingsOpen, setSettingsOpen] = useState(false);
 
@@ -47,11 +51,13 @@ export default function Header({
           </div>
         </div>
 
-        {/* Global City Search Bar */}
-        <div className="flex-1 max-w-sm order-3 sm:order-2">
+        {/* Global Device-Native City Search Bar */}
+        <div className="flex-1 max-w-sm md:max-w-md order-3 sm:order-2">
           <LocationSearchBar
             onSelectCity={onSelectSearchCity}
             currentCity={currentCity}
+            onUseCurrentLocation={onUseCurrentLocation}
+            isLocating={isLocating}
           />
         </div>
 

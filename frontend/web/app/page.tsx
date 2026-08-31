@@ -87,7 +87,11 @@ export default function Home() {
 
   // 1. Fetch & Update Main Dashboard Location (via Search Bar, GPS, or Settings)
   const handleSelectDashboardLocation = useCallback(
-    async (cityName: string) => {
+    async (cityName: string, coords?: { lat: number; lng: number }) => {
+      if (coords) {
+        setGlobeCoords({ lat: coords.lat, lng: coords.lng });
+      }
+
       const toastId = toast.loading(`Loading weather data for ${cityName}...`);
       try {
         const res = await fetch("/api/chat", {
@@ -114,8 +118,8 @@ export default function Home() {
           condition: data.condition || "Clear Sky",
           rainChance: data.rainChance,
           weatherType: data.weatherType || "clear",
-          lat: data.lat ?? 28.61,
-          lng: data.lng ?? 77.2,
+          lat: data.lat ?? coords?.lat ?? 28.61,
+          lng: data.lng ?? coords?.lng ?? 77.2,
           forecast: data.forecast || [],
         });
 
@@ -302,8 +306,10 @@ export default function Home() {
         activeRole={preferences.occupation}
         isForecastOpen={isForecastOpen}
         onToggleForecast={toggleDetailedForecast}
-        onSelectSearchCity={(city) => handleSelectDashboardLocation(city)}
+        onSelectSearchCity={(city, coords) => handleSelectDashboardLocation(city, coords)}
         currentCity={dashboardWeather.city}
+        onUseCurrentLocation={handleGPSDetect}
+        isLocating={isLocating}
         onSelectNavOption={(opt) => {
           setIsChatExpanded(false);
           const loc = dashboardWeather.city;
