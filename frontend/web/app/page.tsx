@@ -7,8 +7,13 @@ import WeatherSummaryCard from "@/components/WeatherSummaryCard";
 import InfoStrip from "@/components/InfoStrip";
 import DetailedForecastPanel, { DetailedDay } from "@/components/DetailedForecastPanel";
 import ChatInputBar, { ChatMessage } from "@/components/ChatInputBar";
+import SectorAdvisoryModal from "@/components/SectorAdvisoryModal";
+import WeatherBulletinExportModal from "@/components/WeatherBulletinExportModal";
+import ClimateBenchmarkModal from "@/components/ClimateBenchmarkModal";
+import WeatherRadarModal from "@/components/WeatherRadarModal";
 import { Preferences } from "@/components/SettingsPanel";
 import type { WeatherCondition } from "@/components/WeatherGlobe";
+import { SupportedLanguage, TRANSLATIONS } from "@/lib/translations";
 import { reverseGeocode, get30DayOutlook } from "@/lib/api";
 import { toast, Toaster } from "react-hot-toast";
 
@@ -52,7 +57,7 @@ type DashboardWeather = {
 };
 
 export default function Home() {
-  // Main Dashboard Weather State (Current / Selected Location)
+  // Main Dashboard Weather State
   const [dashboardWeather, setDashboardWeather] = useState<DashboardWeather>({
     city: "Delhi",
     temp: 30,
@@ -74,6 +79,15 @@ export default function Home() {
   const [isChatExpanded, setIsChatExpanded] = useState(false);
   const [isChatLoading, setIsChatLoading] = useState(false);
   const [isLocating, setIsLocating] = useState(false);
+
+  // Operational Modal States (SIH High Impact Features)
+  const [isAdvisoryOpen, setIsAdvisoryOpen] = useState(false);
+  const [isBulletinOpen, setIsBulletinOpen] = useState(false);
+  const [isClimateOpen, setIsClimateOpen] = useState(false);
+  const [isRadarOpen, setIsRadarOpen] = useState(false);
+
+  // Vernacular Multi-Lingual State
+  const [selectedLanguage, setSelectedLanguage] = useState<SupportedLanguage>("en");
 
   // Chat-specific response state (Decoupled from Dashboard)
   const [chatResponse, setChatResponse] = useState<string | undefined>(undefined);
@@ -100,7 +114,7 @@ export default function Home() {
           body: JSON.stringify({
             message: `Weather overview for ${cityName}`,
             occupation: preferences.occupation,
-            language: preferences.language,
+            language: selectedLanguage,
             location: cityName,
           }),
         });
@@ -152,7 +166,7 @@ export default function Home() {
         toast.error(err?.message || "Failed to load weather report", { id: toastId });
       }
     },
-    [preferences]
+    [preferences, selectedLanguage]
   );
 
   // 2. Conversational Multi-Turn Chat Handler (Decoupled from Dashboard)
@@ -160,7 +174,6 @@ export default function Home() {
     async (message: string, history?: ChatMessage[]) => {
       setIsChatLoading(true);
 
-      // Map chat messages into role/content format
       const formattedHistory = (history || []).map((m) => ({
         role: m.sender === "assistant" ? "assistant" : "user",
         content: m.text,
@@ -173,7 +186,7 @@ export default function Home() {
           body: JSON.stringify({
             message,
             occupation: preferences.occupation,
-            language: preferences.language,
+            language: selectedLanguage,
             location: dashboardWeather.city,
             history: formattedHistory,
           }),
@@ -182,7 +195,6 @@ export default function Home() {
         if (!res.ok) throw new Error("Failed to process conversation query");
         const data = await res.json();
 
-        // Update chat drawer ONLY (Do not overwrite main dashboard city!)
         setChatResponse(data.response);
         setChatResponseCity(data.city);
       } catch (err: any) {
@@ -191,7 +203,7 @@ export default function Home() {
         setIsChatLoading(false);
       }
     },
-    [preferences, dashboardWeather.city]
+    [preferences, selectedLanguage, dashboardWeather.city]
   );
 
   // 3. Live GPS Geolocation Trigger
@@ -214,7 +226,7 @@ export default function Home() {
           setPreferences((prev) => ({ ...prev, defaultLocation: detectedCity }));
           toast.success(`Located in ${detectedCity}`, { id: toastId });
 
-          handleSelectDashboardLocation(detectedCity);
+          handleSelectDashboardLocation(detectedCity, { lat: latitude, lng: longitude });
         } catch {
           toast.error("Could not reverse geocode GPS location", { id: toastId });
         } finally {
@@ -269,7 +281,6 @@ export default function Home() {
     rainChance: f.rainChance,
   }));
 
-  // Toggle Detailed Forecast Panel (auto-minimize chat when forecast opens)
   const toggleDetailedForecast = () => {
     setIsForecastOpen((prev) => {
       const next = !prev;
@@ -278,7 +289,6 @@ export default function Home() {
     });
   };
 
-  // Toggle Chat Drawer (auto-minimize forecast panel when chat opens)
   const toggleChatDrawer = (expanded: boolean) => {
     setIsChatExpanded(expanded);
     if (expanded) setIsForecastOpen(false);
@@ -299,7 +309,7 @@ export default function Home() {
         />
       </div>
 
-      {/* Top Header with Global City Search Bar */}
+      {/* Top Header with Global City Search Bar & Vernacular Language Switcher */}
       <Header
         preferences={preferences}
         onSavePreferences={handleSavePreferences}
@@ -310,13 +320,20 @@ export default function Home() {
         currentCity={dashboardWeather.city}
         onUseCurrentLocation={handleGPSDetect}
         isLocating={isLocating}
+        selectedLanguage={selectedLanguage}
+        onSelectLanguage={(lang) => {
+          setSelectedLanguage(lang);
+          toast.success(`Language set to ${lang.toUpperCase()}`);
+        }}
         onSelectNavOption={(opt) => {
           setIsChatExpanded(false);
           const loc = dashboardWeather.city;
-          if (opt === "overview") handleChatSend(`Give me a detailed overview of ${loc}`);
-          else if (opt === "forecast") toggleDetailedForecast();
-          else if (opt === "advisory") handleChatSend(`Advisory recommendations for ${loc}`);
-          else if (opt === "emergency") handleChatSend(`Are there any weather alerts for ${loc}?`);
+          if (opt === "overview") handleChatSend(`Detailed overview of ${loc}`);
+          else if (opt === "advisory") setIsAdvisoryOpen(true);
+          else if (opt === "radar") setIsRadarOpen(true);
+          else if (opt === "bulletin") setIsBulletinOpen(true);
+          else if (opt === "climate") setIsClimateOpen(true);
+          else if (opt === "emergency") handleChatSend(`Are there any weather alerts or risks for ${loc}?`);
         }}
       />
 
@@ -350,6 +367,57 @@ export default function Home() {
         city={dashboardWeather.city}
         days7={detailed7Days}
         days15={detailedDays15}
+      />
+
+      {/* Sector Decision Intelligence Modal (Agriculture / NDMA / Aviation / Citizen) */}
+      <SectorAdvisoryModal
+        isOpen={isAdvisoryOpen}
+        onClose={() => setIsAdvisoryOpen(false)}
+        city={dashboardWeather.city}
+        temp={dashboardWeather.temp}
+        humidity={dashboardWeather.humidity}
+        windSpeed={dashboardWeather.windSpeed}
+        pressure={dashboardWeather.pressure}
+        rainChance={dashboardWeather.rainChance}
+        condition={dashboardWeather.condition}
+        activeRole={preferences.occupation}
+        lang={selectedLanguage}
+      />
+
+      {/* 1-Click WhatsApp & PDF Bulletin Export Modal */}
+      <WeatherBulletinExportModal
+        isOpen={isBulletinOpen}
+        onClose={() => setIsBulletinOpen(false)}
+        city={dashboardWeather.city}
+        temp={dashboardWeather.temp}
+        condition={dashboardWeather.condition}
+        humidity={dashboardWeather.humidity}
+        windSpeed={dashboardWeather.windSpeed}
+        pressure={dashboardWeather.pressure}
+        rainChance={dashboardWeather.rainChance}
+        forecast={dashboardWeather.forecast}
+        role={preferences.occupation}
+        lang={selectedLanguage}
+      />
+
+      {/* 30-Year Climate Benchmark & Monsoon Deviation Modal */}
+      <ClimateBenchmarkModal
+        isOpen={isClimateOpen}
+        onClose={() => setIsClimateOpen(false)}
+        city={dashboardWeather.city}
+        temp={dashboardWeather.temp}
+        rainChance={dashboardWeather.rainChance}
+        lang={selectedLanguage}
+      />
+
+      {/* Interactive Weather Radar & Synoptic Map Modal */}
+      <WeatherRadarModal
+        isOpen={isRadarOpen}
+        onClose={() => setIsRadarOpen(false)}
+        city={dashboardWeather.city}
+        lat={dashboardWeather.lat}
+        lng={dashboardWeather.lng}
+        lang={selectedLanguage}
       />
 
       {/* Floating Collapsible Chat Input Bar (Decoupled from Dashboard with Multi-Turn Memory) */}
