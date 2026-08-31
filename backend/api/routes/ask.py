@@ -265,6 +265,7 @@ async def ask_weather_question(
             severity = {"severity": "normal", "alerts": [], "alert_count": 0}
         else:
             weather_data = await weather_service.fetch_weather(lat, lng)
+            weather_data["place_info"] = place_info
             severity = weather_service.classify_severity(weather_data)
 
         # Step 3: Generate grounded response (LLM call #2)

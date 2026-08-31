@@ -6,6 +6,7 @@ import Header from "@/components/Header";
 import WeatherSummaryCard from "@/components/WeatherSummaryCard";
 import InfoStrip from "@/components/InfoStrip";
 import ForecastStrip, { ForecastDay } from "@/components/ForecastStrip";
+import DetailedForecastPanel, { DetailedDay } from "@/components/DetailedForecastPanel";
 import ChatInputBar from "@/components/ChatInputBar";
 import { Preferences } from "@/components/SettingsPanel";
 import type { WeatherCondition } from "@/components/WeatherGlobe";
@@ -47,6 +48,8 @@ export default function Home() {
   const [weatherCondition, setWeatherCondition] = useState<WeatherCondition>("clear");
   const [result, setResult] = useState<WeatherResult | null>(null);
   const [outlook30Days, setOutlook30Days] = useState<ForecastDay[]>([]);
+  const [detailedDays15, setDetailedDays15] = useState<DetailedDay[]>([]);
+  const [isForecastOpen, setIsForecastOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isLocating, setIsLocating] = useState(false);
 
@@ -60,7 +63,9 @@ export default function Home() {
     async (message: string, prefsOverride?: Preferences, customLocation?: string) => {
       setIsLoading(true);
       const activePrefs = prefsOverride ?? preferences;
-      const targetLoc = customLocation || activePrefs.defaultLocation || "Delhi";
+
+      // Allow backend to parse any city typed in natural language, or use fallback
+      const targetLoc = customLocation || undefined;
 
       try {
         const res = await fetch("/api/chat", {
@@ -83,7 +88,7 @@ export default function Home() {
           setLocation({ lat: data.lat, lng: data.lng });
         }
 
-        // Fetch 30-day extended outlook for the forecast strip toggle
+        // Fetch 30-day extended outlook for the forecast strip & detailed panel
         try {
           const outlookRes = await get30DayOutlook(data.lat, data.lng, data.city);
           if (outlookRes?.days) {
@@ -92,13 +97,27 @@ export default function Home() {
               return {
                 date: dt.getDate(),
                 day: ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][dt.getDay()],
-                icon: d.precipitation_probability > 50 ? "🌧️" : "🌤️",
+                condition: d.precipitation_probability > 50 ? "Rain" : "Partly Cloudy",
                 highTemp: d.temperature_max,
                 lowTemp: d.temperature_min,
                 rainChance: d.precipitation_probability,
               };
             });
             setOutlook30Days(mapped30);
+
+            const mappedDetailed: DetailedDay[] = outlookRes.days.map((d: any) => {
+              const dt = new Date(d.date);
+              return {
+                date: `${dt.getDate()} ${dt.toLocaleString("default", { month: "short" })}`,
+                day: ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][dt.getDay()],
+                condition: d.precipitation_probability > 50 ? "Rain" : "Partly Cloudy",
+                highTemp: d.temperature_max,
+                lowTemp: d.temperature_min,
+                rainChance: d.precipitation_probability,
+                windSpeed: d.wind_speed_max,
+              };
+            });
+            setDetailedDays15(mappedDetailed);
           }
         } catch {}
       } catch (err: any) {
@@ -110,7 +129,7 @@ export default function Home() {
     [preferences]
   );
 
-  // Live GPS Geolocation Trigger (Google Maps style)
+  // Live GPS Geolocation Trigger
   const handleGPSDetect = useCallback(() => {
     if (!navigator.geolocation) {
       toast.error("Geolocation is not supported by your browser");
@@ -129,7 +148,7 @@ export default function Home() {
 
           setLocation({ lat: latitude, lng: longitude });
           setPreferences((prev) => ({ ...prev, defaultLocation: detectedCity }));
-          toast.success(`📍 Located in ${detectedCity}`, { id: toastId });
+          toast.success(`Located in ${detectedCity}`, { id: toastId });
 
           handleSend(`Weather in ${detectedCity}`, undefined, detectedCity);
         } catch {
@@ -177,6 +196,15 @@ export default function Home() {
     }
   };
 
+  const detailed7Days: DetailedDay[] = (result?.forecast || []).map((f) => ({
+    date: f.date,
+    day: f.day,
+    condition: f.condition || "Clear",
+    highTemp: f.highTemp,
+    lowTemp: f.lowTemp,
+    rainChance: f.rainChance,
+  }));
+
   return (
     <main className="relative h-screen w-screen overflow-hidden select-none">
       <Toaster position="top-right" />
@@ -197,11 +225,14 @@ export default function Home() {
         preferences={preferences}
         onSavePreferences={handleSavePreferences}
         activeRole={preferences.occupation}
+        isForecastOpen={isForecastOpen}
+        onToggleForecast={() => setIsForecastOpen((prev) => !prev)}
         onSelectNavOption={(opt) => {
-          if (opt === "overview") handleSend(`Give me an overview of ${preferences.defaultLocation}`);
-          else if (opt === "forecast") handleSend(`7-day forecast for ${preferences.defaultLocation}`);
-          else if (opt === "advisory") handleSend(`Advisory recommendations for ${preferences.defaultLocation}`);
-          else if (opt === "emergency") handleSend(`Are there any weather alerts for ${preferences.defaultLocation}?`);
+          const loc = result?.city || preferences.defaultLocation || "Delhi";
+          if (opt === "overview") handleSend(`Give me an overview of ${loc}`);
+          else if (opt === "forecast") setIsForecastOpen((prev) => !prev);
+          else if (opt === "advisory") handleSend(`Advisory recommendations for ${loc}`);
+          else if (opt === "emergency") handleSend(`Are there any weather alerts for ${loc}?`);
         }}
       />
 
@@ -219,7 +250,7 @@ export default function Home() {
       />
 
       {/* Centered Frosted-Glass Info Strip */}
-      {result && (
+      {result && !isForecastOpen && (
         <InfoStrip
           city={result.city}
           temp={result.temp}
@@ -229,9 +260,22 @@ export default function Home() {
       )}
 
       {/* Horizontal Frosted-Glass Forecast Strip */}
-      {result?.forecast && result.forecast.length > 0 && (
-        <ForecastStrip days={result.forecast} outlook30Days={outlook30Days} />
+      {result?.forecast && result.forecast.length > 0 && !isForecastOpen && (
+        <ForecastStrip
+          days={result.forecast}
+          outlook30Days={outlook30Days}
+          onOpenDetailed={() => setIsForecastOpen(true)}
+        />
       )}
+
+      {/* Expandable Detailed Forecast Panel with Black-to-Transparent Gradient Header */}
+      <DetailedForecastPanel
+        isOpen={isForecastOpen}
+        onClose={() => setIsForecastOpen(false)}
+        city={result?.city ?? preferences.defaultLocation ?? "Delhi"}
+        days7={detailed7Days}
+        days15={detailedDays15}
+      />
 
       {/* Floating Collapsible Chat Input Bar (Bottom-Center) */}
       <div className="absolute bottom-6 md:bottom-8 left-1/2 -translate-x-1/2 z-20 w-[94%] max-w-2xl">

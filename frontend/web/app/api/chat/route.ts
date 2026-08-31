@@ -6,16 +6,17 @@ function mapWeatherCodeToType(code: number): "clear" | "cloudy" | "rainy" {
   return "rainy";
 }
 
-function mapWeatherCodeToIcon(code: number): string {
-  if (code === 0) return "☀️";
-  if (code === 1) return "🌤️";
-  if (code === 2) return "⛅";
-  if (code === 3) return "☁️";
-  if ([45, 48].includes(code)) return "🌫️";
-  if ([51, 53, 55, 61, 63, 65, 80, 81, 82].includes(code)) return "🌧️";
-  if ([71, 73, 75, 77, 85, 86].includes(code)) return "❄️";
-  if ([95, 96, 99].includes(code)) return "⛈️";
-  return "🌤️";
+function mapWeatherCodeToDescription(code: number): string {
+  if (code === 0) return "Clear Sky";
+  if (code === 1) return "Mainly Clear";
+  if (code === 2) return "Partly Cloudy";
+  if (code === 3) return "Overcast";
+  if ([45, 48].includes(code)) return "Foggy";
+  if ([51, 53, 55].includes(code)) return "Light Drizzle";
+  if ([61, 63, 65, 80, 81, 82].includes(code)) return "Rain";
+  if ([71, 73, 75, 77, 85, 86].includes(code)) return "Snow";
+  if ([95, 96, 99].includes(code)) return "Thunderstorm";
+  return "Partly Cloudy";
 }
 
 export async function POST(request: Request) {
@@ -80,15 +81,23 @@ export async function POST(request: Request) {
         return {
           date: dateNum,
           day: dayName,
-          icon: mapWeatherCodeToIcon(d.weather_code ?? 0),
+          condition: mapWeatherCodeToDescription(d.weather_code ?? 0),
+          weatherCode: d.weather_code ?? 0,
           highTemp: d.temperature_max ?? 30,
           lowTemp: d.temperature_min ?? 22,
           rainChance: d.precipitation_probability ?? 0,
         };
       });
 
+      const extractedCity =
+        placeInfo.place_name ||
+        placeInfo.city ||
+        backendData.intent?.place ||
+        location ||
+        "Delhi";
+
       return NextResponse.json({
-        city: placeInfo.place_name || placeInfo.city || backendData.intent?.place || location || "Delhi",
+        city: extractedCity,
         temp: current.temperature ?? 30,
         feelsLike: current.apparent_temperature ?? current.temperature ?? 30,
         humidity: current.humidity ?? 65,
@@ -119,8 +128,8 @@ export async function POST(request: Request) {
       lng: 77.2,
       response: `Weather update for ${location || "Delhi"}: Current conditions are favorable with a temperature of around 29.5°C and 74% humidity. Winds are calm at 10 km/h with dry conditions expected over the next 48 hours.`,
       forecast: [
-        { date: "Today", day: "Now", icon: "☀️", highTemp: 33, lowTemp: 24, rainChance: 10 },
-        { date: "Tomorrow", day: "Tue", icon: "🌤️", highTemp: 34, lowTemp: 25, rainChance: 20 },
+        { date: "Today", day: "Now", condition: "Clear Sky", highTemp: 33, lowTemp: 24, rainChance: 10 },
+        { date: "Tomorrow", day: "Tue", condition: "Partly Cloudy", highTemp: 34, lowTemp: 25, rainChance: 20 },
       ],
     });
   } catch (error) {
@@ -138,7 +147,7 @@ export async function POST(request: Request) {
       lng: 77.2,
       response: "WeatherGPT ready. Ask any question about temperature, rain, or farming forecasts.",
       forecast: [
-        { date: "Today", day: "Now", icon: "🌤️", highTemp: 32, lowTemp: 24, rainChance: 20 },
+        { date: "Today", day: "Now", condition: "Partly Cloudy", highTemp: 32, lowTemp: 24, rainChance: 20 },
       ],
     });
   }

@@ -53,14 +53,12 @@ function PhotorealisticEarth({ lat, lng, weatherCondition }: Props) {
     "/textures/earth-clouds.png",
   ]);
 
-  // Adjust cloud opacity and lighting based on weather condition
   const cloudOpacity = useMemo(() => {
     if (weatherCondition === "rainy") return 0.65;
     if (weatherCondition === "cloudy") return 0.45;
     return 0.28;
   }, [weatherCondition]);
 
-  // Auto rotation of Earth and realistic cloud movement
   useFrame((_, delta) => {
     if (earthGroupRef.current) {
       earthGroupRef.current.rotation.y += delta * 0.02;
@@ -70,11 +68,12 @@ function PhotorealisticEarth({ lat, lng, weatherCondition }: Props) {
     }
   });
 
-  const earthRadius = 2.4;
+  const earthRadius = 2.45;
   const markerPos = latLngToVector3(lat, lng, earthRadius + 0.02);
 
+  // Positioned slightly in -Y axis ([0, -2.45, 0]) to make room for expanding forecast panel
   return (
-    <group position={[0, -1.9, 0]}>
+    <group position={[0, -2.45, 0]}>
       {/* Atmosphere Outer Glow Halo */}
       <Sphere args={[earthRadius * 1.06, 64, 64]}>
         <shaderMaterial
@@ -97,7 +96,7 @@ function PhotorealisticEarth({ lat, lng, weatherCondition }: Props) {
           />
         </Sphere>
 
-        {/* Photorealistic Atmospheric Cloud Layer */}
+        {/* Atmospheric Cloud Layer */}
         <Sphere ref={cloudsRef} args={[earthRadius + 0.015, 64, 64]}>
           <meshStandardMaterial
             map={cloudsMap}
@@ -125,10 +124,10 @@ function PhotorealisticEarth({ lat, lng, weatherCondition }: Props) {
 }
 
 function FallbackHorizonEarth({ lat, lng }: Props) {
-  const earthRadius = 2.4;
+  const earthRadius = 2.45;
   const markerPos = latLngToVector3(lat, lng, earthRadius + 0.02);
   return (
-    <group position={[0, -1.9, 0]}>
+    <group position={[0, -2.45, 0]}>
       <Sphere args={[earthRadius, 32, 32]}>
         <meshStandardMaterial color="#0f2b48" roughness={0.7} />
       </Sphere>
@@ -151,14 +150,12 @@ export default function WeatherGlobe({ lat, lng, weatherCondition }: Props) {
 
   return (
     <Canvas
-      camera={{ position: [0, 0.5, 3.2], fov: 45 }}
+      camera={{ position: [0, 0.45, 3.4], fov: 45 }}
       dpr={dpr}
       gl={{ antialias: true, alpha: true }}
     >
       <ambientLight intensity={0.45} />
-      {/* Sunlight coming from space */}
       <directionalLight position={[6, 4, 3]} intensity={2.2} color="#ffffff" />
-      {/* Subtle blue space rim bounce */}
       <directionalLight position={[-4, 2, -2]} intensity={0.6} color="#38bdf8" />
 
       <Suspense fallback={<FallbackHorizonEarth lat={lat} lng={lng} weatherCondition={weatherCondition} />}>

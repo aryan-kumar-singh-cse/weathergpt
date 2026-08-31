@@ -1,24 +1,42 @@
 "use client";
 
 import React, { useState } from "react";
-import { CloudRain } from "lucide-react";
+import { CloudRain, Sun, Cloud, CloudLightning, CloudSnow } from "lucide-react";
 
 export type ForecastDay = {
   date: number | string;
   day: string;
-  icon: string;
+  condition?: string;
+  weatherCode?: number;
   highTemp: number;
   lowTemp?: number;
   rainChance?: number;
-  condition?: string;
 };
 
 type Props = {
   days: ForecastDay[];
   outlook30Days?: ForecastDay[];
+  onOpenDetailed?: () => void;
 };
 
-export default function ForecastStrip({ days, outlook30Days = [] }: Props) {
+function renderDayIcon(condition?: string) {
+  const condLower = (condition || "").toLowerCase();
+  if (condLower.includes("rain") || condLower.includes("shower")) {
+    return <CloudRain className="w-5 h-5 text-sky-400" />;
+  }
+  if (condLower.includes("storm") || condLower.includes("thunder")) {
+    return <CloudLightning className="w-5 h-5 text-amber-400" />;
+  }
+  if (condLower.includes("snow")) {
+    return <CloudSnow className="w-5 h-5 text-indigo-200" />;
+  }
+  if (condLower.includes("cloud") || condLower.includes("overcast")) {
+    return <Cloud className="w-5 h-5 text-slate-300" />;
+  }
+  return <Sun className="w-5 h-5 text-amber-400" />;
+}
+
+export default function ForecastStrip({ days, outlook30Days = [], onOpenDetailed }: Props) {
   const [view, setView] = useState<"week" | "month">("week");
   const visibleDays =
     view === "week"
@@ -40,27 +58,38 @@ export default function ForecastStrip({ days, outlook30Days = [] }: Props) {
           {view === "week" ? "7-Day Meteorological Outlook" : "30-Day Climate Outlook"}
         </span>
 
-        <div className="flex items-center gap-1.5 p-0.5 rounded-full bg-white/10 border border-white/15">
-          <button
-            onClick={() => setView("week")}
-            className={`text-[11px] font-mono px-3 py-1 rounded-full transition-all cursor-pointer ${
-              view === "week"
-                ? "bg-white/25 text-white font-bold shadow-sm"
-                : "text-white/60 hover:text-white"
-            }`}
-          >
-            7-Day
-          </button>
-          <button
-            onClick={() => setView("month")}
-            className={`text-[11px] font-mono px-3 py-1 rounded-full transition-all cursor-pointer ${
-              view === "month"
-                ? "bg-white/25 text-white font-bold shadow-sm"
-                : "text-white/60 hover:text-white"
-            }`}
-          >
-            30-Day
-          </button>
+        <div className="flex items-center gap-2">
+          {onOpenDetailed && (
+            <button
+              onClick={onOpenDetailed}
+              className="text-[11px] font-mono text-white/70 hover:text-white underline underline-offset-2 transition cursor-pointer"
+            >
+              Detailed View
+            </button>
+          )}
+
+          <div className="flex items-center gap-1.5 p-0.5 rounded-full bg-white/10 border border-white/15">
+            <button
+              onClick={() => setView("week")}
+              className={`text-[11px] font-mono px-3 py-1 rounded-full transition-all cursor-pointer ${
+                view === "week"
+                  ? "bg-white/25 text-white font-bold shadow-sm"
+                  : "text-white/60 hover:text-white"
+              }`}
+            >
+              7-Day
+            </button>
+            <button
+              onClick={() => setView("month")}
+              className={`text-[11px] font-mono px-3 py-1 rounded-full transition-all cursor-pointer ${
+                view === "month"
+                  ? "bg-white/25 text-white font-bold shadow-sm"
+                  : "text-white/60 hover:text-white"
+              }`}
+            >
+              30-Day
+            </button>
+          </div>
         </div>
       </div>
 
@@ -75,9 +104,9 @@ export default function ForecastStrip({ days, outlook30Days = [] }: Props) {
             <span className="text-[10px] text-white/60 uppercase">{d.day || "Day"}</span>
             <span className="text-xs font-semibold text-white/90">{d.date}</span>
 
-            <span className="text-2xl my-1.5 transform hover:scale-110 transition-transform">
-              {d.icon || "🌤️"}
-            </span>
+            <div className="my-2 p-1 rounded-full bg-white/5 flex items-center justify-center">
+              {renderDayIcon(d.condition)}
+            </div>
 
             <div className="flex items-baseline gap-1">
               <span className="text-sm font-bold text-white">

@@ -9,6 +9,7 @@ import logging
 from typing import Dict, List, Optional, Any
 from datetime import datetime
 import json
+import re
 
 from backend.services.llm_service import llm_service
 
@@ -108,32 +109,50 @@ class ChatService:
             logger.info("📞 Calling LLM for intent extraction...")
             response = await self.llm.call_llm(
                 messages=messages,
-                temperature=0.3,
+                temperature=0.2,
                 max_tokens=200,
                 json_mode=True
             )
 
             logger.info(f"✅ LLM returned response: {response[:200]}")
-            result = json.loads(response)
+            
+            # Robust JSON extraction (handles markdown ```json ... ``` wrappers)
+            cleaned_response = response.strip()
+            if "```" in cleaned_response:
+                match = re.search(r'```(?:json)?\s*([\s\S]*?)\s*```', cleaned_response)
+                if match:
+                    cleaned_response = match.group(1)
+            
+            json_match = re.search(r'\{[\s\S]*\}', cleaned_response)
+            if json_match:
+                cleaned_response = json_match.group(0)
+
+            result = json.loads(cleaned_response)
             result["confidence"] = 0.9
+            
+            # If LLM place is missing or generic, verify with fallback
+            if not result.get("place") or result.get("place", "").lower() in ["india", "current", "here", "today", "now"]:
+                fallback_res = self._fallback_intent_extraction(query, language)
+                if fallback_res.get("place") and fallback_res.get("place") != "India":
+                    result["place"] = fallback_res["place"]
+                    result["nationwide"] = False
+                    
             logger.info(f"✅ Intent extracted successfully: {result}")
             return result
 
         except (json.JSONDecodeError, KeyError, Exception) as e:
             logger.error(f"❌ Intent extraction failed with error: {type(e).__name__}: {str(e)}")
-            logger.warning(f"⚠️ Falling back to keyword matching")
+            logger.warning(f"⚠️ Falling back to natural language regex & keyword matching")
             return self._fallback_intent_extraction(query, language)
 
     def _fallback_intent_extraction(self, query: str, language: str) -> Dict[str, Any]:
-        """Fallback intent extraction using keyword matching."""
-        query_lower = query.lower()
+        """Fallback intent extraction using NLP regex and multi-city dictionary."""
+        query_lower = query.lower().strip()
 
         # Intent detection
-        if any(kw in query_lower for kw in ["forecast", "tomorrow", "weekend", "next week", "predict"]):
+        if any(kw in query_lower for kw in ["forecast", "tomorrow", "weekend", "next week", "predict", "upcoming", "7 day", "15 day"]):
             intent = "forecast"
-        elif any(kw in query_lower for kw in ["current", "now", "today", "right now"]):
-            intent = "current"
-        elif any(kw in query_lower for kw in ["alert", "warning", "danger", "storm", "cyclone", "risk"]):
+        elif any(kw in query_lower for kw in ["alert", "warning", "danger", "storm", "cyclone", "risk", "rain chance"]):
             intent = "risk_check"
         elif any(kw in query_lower for kw in ["historical", "past", "normal", "average", "trend"]):
             intent = "historical"
@@ -142,21 +161,55 @@ class ChatService:
         else:
             intent = "current"
 
-        # Place extraction (common Indian cities)
+        # 1. Regex-based preposition pattern matching (e.g. "weather in Mumbai", "temperature for Paris", "forecast at Jaipur")
         place = None
-        for city in ["mumbai", "delhi", "chennai", "bangalore", "bengaluru", "kolkata", "hyderabad",
-                      "pune", "ahmedabad", "jaipur", "lucknow", "kochi", "goa", "trivandrum",
-                      "surat", "bhubaneswar", "coimbatore"]:
-            if city in query_lower:
-                place = city.title()
-                break
+        patterns = [
+            r'\b(?:in|at|for|around|near|of|to)\s+([a-zA-Z\s\.\-]+?)(?:\s+(?:today|tomorrow|this week|right now|next week|please|\?|\.|\,|$)|$)',
+            r'^(?:weather|forecast|temperature|temp|climate|conditions)\s+(?:in\s+|for\s+|at\s+)?([a-zA-Z\s\.\-]+?)(?:\s+(?:today|tomorrow|this week|now|\?|\.|\,|$)|$)',
+            r'^([a-zA-Z\s\.\-]+?)\s+(?:weather|forecast|temperature|temp|climate|conditions)',
+            r'(?:how is|what is|tell me about)\s+(?:the\s+)?(?:weather|temperature|forecast)?\s*(?:in|at|for)\s+([a-zA-Z\s\.\-]+?)(?:\s+(?:today|tomorrow|\?|\.|\,|$)|$)'
+        ]
+
+        for pat in patterns:
+            match = re.search(pat, query, re.IGNORECASE)
+            if match:
+                candidate = match.group(1).strip()
+                # Exclude stop words
+                candidate_clean = re.sub(r'^(the|a|an|current|today|tomorrow)\s+', '', candidate, flags=re.IGNORECASE).strip()
+                if candidate_clean and candidate_clean.lower() not in ["weather", "forecast", "india", "here", "city", "place"]:
+                    place = candidate_clean.title()
+                    break
+
+        # 2. Dictionary scan of common cities if regex didn't find one
+        if not place:
+            known_cities = [
+                "ghaziabad", "noida", "greater noida", "gurgaon", "gurugram", "faridabad", "delhi", "new delhi",
+                "mumbai", "pune", "nagpur", "nashik", "aurangabad", "chhatrapati sambhajinagar",
+                "bangalore", "bengaluru", "mysore", "mysuru", "mangalore", "hubli",
+                "chennai", "coimbatore", "madurai", "salem", "trichy",
+                "hyderabad", "visakhapatnam", "vijayawada", "tirupati",
+                "kolkata", "howrah", "siliguri", "durgapur",
+                "ahmedabad", "surat", "vadodara", "rajkot",
+                "jaipur", "jodhpur", "udaipur", "kota", "bikaner", "ajmer",
+                "lucknow", "kanpur", "agra", "varanasi", "prayagraj", "allahabad", "meerut", "aligarh", "bareilly",
+                "patna", "gaya", "muzaffarpur", "ranchi", "jamshedpur", "dhanbad",
+                "bhopal", "indore", "gwalior", "jabalpur", "ujjain", "raipur", "bilaspur",
+                "chandigarh", "amritsar", "ludhiana", "jalandhar", "shimla", "manali", "dharamshala",
+                "dehradun", "haridwar", "rishikesh", "srinagar", "jammu", "guwahati", "shillong", "bhubaneswar", "cuttack",
+                "kochi", "trivandrum", "thiruvananthapuram", "kozhikode", "thrissur", "goa", "panaji",
+                "london", "paris", "new york", "tokyo", "dubai", "singapore", "sydney", "toronto"
+            ]
+            for city in known_cities:
+                if re.search(rf'\b{re.escape(city)}\b', query_lower):
+                    place = city.title()
+                    break
 
         return {
             "place": place or "India",
             "language": language,
             "intent": intent,
             "nationwide": place is None,
-            "confidence": 0.6
+            "confidence": 0.7 if place else 0.4
         }
 
     def _is_greeting_or_simple_query(self, query: str) -> bool:

@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { Wind, Droplets, Compass, MapPin, Gauge } from "lucide-react";
+import { Wind, Droplets, MapPin, Gauge, Navigation } from "lucide-react";
 
 type Props = {
   city: string;
@@ -36,8 +36,8 @@ export default function WeatherSummaryCard({
       {/* City & Live Location Indicator */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-1.5 overflow-hidden">
-          <MapPin className="w-4 h-4 text-yellow-400 shrink-0" />
-          <p className="text-sm font-semibold text-white/90 font-mono tracking-wide truncate">
+          <MapPin className="w-4 h-4 text-white/90 shrink-0" />
+          <p className="text-sm font-semibold text-white/95 font-mono tracking-wide truncate">
             {city || "Live Location"}
           </p>
         </div>
@@ -47,15 +47,16 @@ export default function WeatherSummaryCard({
             onClick={onRefreshGPS}
             disabled={isLocating}
             title="Update live GPS location"
-            className="p-1 rounded-lg bg-white/10 hover:bg-white/20 text-xs font-mono text-white/70 hover:text-white transition cursor-pointer"
+            className="px-2.5 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-xs font-mono text-white/80 hover:text-white transition cursor-pointer flex items-center gap-1"
           >
-            {isLocating ? "..." : "📍 GPS"}
+            <Navigation className="w-3 h-3 text-white/90" />
+            <span>{isLocating ? "Locating..." : "GPS"}</span>
           </button>
         )}
       </div>
 
       {/* Main Temperature & Condition */}
-      <div className="mt-2 flex items-baseline justify-between">
+      <div className="mt-3 flex items-baseline justify-between">
         <p className="text-4xl md:text-5xl font-extrabold tracking-tight">
           {Math.round(temp)}°<span className="text-2xl font-normal text-white/70">C</span>
         </p>

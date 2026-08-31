@@ -1,14 +1,13 @@
 "use client";
 
 import React from "react";
-import { CloudRain, Sparkles } from "lucide-react";
+import { CloudRain, MapPin } from "lucide-react";
 
 type Props = {
   city: string;
   temp: number;
   condition: string;
   rainChance?: number;
-  groundingSource?: string;
 };
 
 export default function InfoStrip({
@@ -16,7 +15,6 @@ export default function InfoStrip({
   temp,
   condition,
   rainChance,
-  groundingSource = "Open-Meteo",
 }: Props) {
   return (
     <div
@@ -27,7 +25,7 @@ export default function InfoStrip({
                  text-white font-mono shadow-2xl animate-fade-in transition-all"
     >
       <div className="flex items-center gap-2">
-        <Sparkles className="w-4 h-4 text-yellow-400 shrink-0" />
+        <MapPin className="w-4 h-4 text-white/80 shrink-0" />
         <span className="text-sm md:text-base font-bold tracking-wide text-white">
           {city}
         </span>

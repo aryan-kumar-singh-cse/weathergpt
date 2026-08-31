@@ -12,6 +12,7 @@ import {
   ChevronDown,
   Trash2,
   CornerDownLeft,
+  Bot,
 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 
@@ -34,8 +35,8 @@ type Props = {
 const SUGGESTED_PROMPTS = [
   "Will it rain tomorrow?",
   "What should I plan this week considering the weather?",
-  "Farming advisory & irrigation timing",
-  "Aviation visibility & wind conditions",
+  "Farming advisory and irrigation timing",
+  "Aviation visibility and wind conditions",
 ];
 
 export default function ChatInputBar({
@@ -57,7 +58,6 @@ export default function ChatInputBar({
   useEffect(() => {
     if (latestResponse) {
       setMessages((prev) => {
-        // Prevent duplicate assistant responses if already appended
         const last = prev[prev.length - 1];
         if (last && last.sender === "assistant" && last.text === latestResponse) {
           return prev;
@@ -88,7 +88,6 @@ export default function ChatInputBar({
     const query = (textToSend || value).trim();
     if (!query || isLoading) return;
 
-    // Append user message immediately
     setMessages((prev) => [
       ...prev,
       {
@@ -104,7 +103,7 @@ export default function ChatInputBar({
     setValue("");
   };
 
-  // Browser Speech-to-Text Voice Recognition
+  // Speech-to-Text Voice Recognition
   const handleVoiceInput = () => {
     if (!("webkitSpeechRecognition" in window || "SpeechRecognition" in window)) {
       alert("Speech recognition is not supported in this browser.");
@@ -150,7 +149,7 @@ export default function ChatInputBar({
                      border border-white/25 flex items-center justify-center
                      text-white/90 hover:text-white hover:scale-105 active:scale-95 transition-all shadow-2xl cursor-pointer"
         >
-          <MessageSquare className="w-5 h-5 text-yellow-400" />
+          <MessageSquare className="w-5 h-5 text-white" />
         </button>
       </div>
     );
@@ -162,14 +161,14 @@ export default function ChatInputBar({
       {isExpanded && (
         <div
           className="w-full max-h-[380px] md:max-h-[460px] flex flex-col rounded-3xl
-                     bg-gray-950/80 backdrop-blur-2xl border border-white/20
+                     bg-gray-950/85 backdrop-blur-2xl border border-white/20
                      shadow-2xl animate-fade-in overflow-hidden transition-all duration-300"
         >
           {/* Header */}
           <div className="flex items-center justify-between px-5 py-3.5 border-b border-white/10 bg-white/5">
             <div className="flex items-center gap-2.5">
-              <div className="w-7 h-7 rounded-full bg-yellow-400/20 border border-yellow-400/40 flex items-center justify-center text-yellow-400">
-                <Sparkles className="w-3.5 h-3.5" />
+              <div className="w-7 h-7 rounded-full bg-white/15 border border-white/20 flex items-center justify-center text-white">
+                <Bot className="w-3.5 h-3.5" />
               </div>
               <div>
                 <h3 className="text-xs font-bold font-mono tracking-tight text-white">
@@ -208,8 +207,8 @@ export default function ChatInputBar({
           >
             {messages.length === 0 ? (
               <div className="text-center py-6 space-y-3">
-                <div className="w-10 h-10 mx-auto rounded-full bg-white/10 flex items-center justify-center text-yellow-400">
-                  <Sparkles className="w-5 h-5" />
+                <div className="w-10 h-10 mx-auto rounded-full bg-white/10 flex items-center justify-center text-white">
+                  <Bot className="w-5 h-5 text-white/90" />
                 </div>
                 <p className="text-xs text-white/70 font-mono">
                   Ask any meteorological, planning, or agricultural query for{" "}
@@ -238,15 +237,15 @@ export default function ChatInputBar({
                   }`}
                 >
                   {msg.sender === "assistant" && (
-                    <div className="w-7 h-7 rounded-full bg-yellow-400/20 border border-yellow-400/40 flex items-center justify-center text-yellow-400 shrink-0 mt-0.5">
-                      <Sparkles className="w-3.5 h-3.5" />
+                    <div className="w-7 h-7 rounded-full bg-white/15 border border-white/20 flex items-center justify-center text-white shrink-0 mt-0.5">
+                      <Bot className="w-3.5 h-3.5" />
                     </div>
                   )}
 
                   <div
                     className={`max-w-[85%] rounded-2xl p-3.5 md:p-4 text-white shadow-md ${
                       msg.sender === "user"
-                        ? "bg-yellow-400/25 border border-yellow-400/40 text-white rounded-br-none ml-auto"
+                        ? "bg-white/20 border border-white/30 text-white rounded-br-none ml-auto"
                         : "bg-white/10 border border-white/15 rounded-bl-none"
                     }`}
                   >
@@ -274,11 +273,11 @@ export default function ChatInputBar({
             {/* Typing / Processing Indicator */}
             {isLoading && (
               <div className="flex gap-3 justify-start items-center">
-                <div className="w-7 h-7 rounded-full bg-yellow-400/20 border border-yellow-400/40 flex items-center justify-center text-yellow-400 shrink-0">
+                <div className="w-7 h-7 rounded-full bg-white/15 border border-white/20 flex items-center justify-center text-white shrink-0">
                   <Loader2 className="w-3.5 h-3.5 animate-spin" />
                 </div>
                 <div className="rounded-2xl rounded-bl-none p-3 bg-white/10 border border-white/15 text-white/70 font-mono text-xs flex items-center gap-2">
-                  <span className="inline-block w-2 h-2 rounded-full bg-yellow-400 animate-pulse" />
+                  <span className="inline-block w-2 h-2 rounded-full bg-white animate-pulse" />
                   <span>Synthesizing live meteorological intelligence for {city}...</span>
                 </div>
               </div>
@@ -329,7 +328,7 @@ export default function ChatInputBar({
           onClick={() => handleSubmit()}
           disabled={!value.trim() || isLoading}
           aria-label="Send query"
-          className="w-8 h-8 rounded-full bg-yellow-400 hover:bg-yellow-500 disabled:opacity-40 disabled:hover:bg-yellow-400 text-gray-950 flex items-center justify-center transition-all hover:scale-105 active:scale-95 cursor-pointer shrink-0"
+          className="w-8 h-8 rounded-full bg-white/20 hover:bg-white/30 disabled:opacity-40 disabled:hover:bg-white/20 text-white flex items-center justify-center transition-all hover:scale-105 active:scale-95 cursor-pointer shrink-0"
         >
           {isLoading ? (
             <Loader2 className="w-3.5 h-3.5 animate-spin" />
