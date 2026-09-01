@@ -1,37 +1,50 @@
 """
 WeatherGPT Weather Data Service
-Live Open-Meteo integration with severity classification
+High-precision multi-model weather engine:
+1. Indigenous IMD Station Ingestion (IndiaAPI / MoES DPI)
+2. High-Resolution ECMWF / DWD ICON Seamless NWP
 """
 
 import logging
 from typing import Dict, Any, Optional, List
 from datetime import datetime
 import httpx
+from backend.services.indian_met_service import indian_met_service
 
 logger = logging.getLogger(__name__)
 
 
 class WeatherService:
     """
-    Weather data service using Open-Meteo API.
+    Weather data service integrating Open-Meteo NWP and indigenous IMD Station telemetry.
     Provides current conditions, forecasts, and severity classification.
     """
 
     def __init__(self):
         self.base_url = "https://api.open-meteo.com/v1/forecast"
-        self.timeout = 10.0  # seconds
+        self.timeout = 10.0
 
-    async def fetch_weather(self, lat: float, lng: float) -> Dict[str, Any]:
+    async def fetch_weather(self, lat: float, lng: float, city_name: Optional[str] = None) -> Dict[str, Any]:
         """
-        Fetch current weather and forecast from Open-Meteo.
+        Fetch current weather and forecast with multi-tier sovereign Indian fallback.
 
         Args:
             lat: Latitude
             lng: Longitude
+            city_name: Optional city name for IMD station lookup
 
         Returns:
             Dict with current conditions and 7-day forecast
         """
+        # 1. Attempt official IMD observation lookup if city name is available
+        imd_data = None
+        if city_name:
+            try:
+                imd_data = await indian_met_service.fetch_imd_city_weather(city_name)
+            except Exception as e:
+                logger.info(f"IMD station lookup bypassed: {e}")
+
+        # 2. Fetch high-resolution NWP telemetry from Open-Meteo
         params = {
             "latitude": lat,
             "longitude": lng,
@@ -62,26 +75,37 @@ class WeatherService:
                 response.raise_for_status()
                 data = response.json()
 
-            # Structure the response
+            current_dict = self._parse_current(data.get("current", {}))
+
+            # If IMD station observation returned valid data, augment current observation
+            data_source = "Open-Meteo ECMWF/DWD"
+            if imd_data and imd_data.get("current_temp") is not None:
+                current_dict["temperature"] = imd_data["current_temp"]
+                if imd_data.get("humidity"):
+                    current_dict["humidity"] = imd_data["humidity"]
+                data_source = "IMD_Station + Open-Meteo"
+
             result = {
                 "location": {
                     "lat": lat,
                     "lng": lng,
+                    "city": city_name or "Live Location",
                     "timezone": data.get("timezone", "UTC")
                 },
-                "current": self._parse_current(data.get("current", {})),
+                "current": current_dict,
                 "forecast": self._parse_forecast(data.get("daily", {})),
-                "data_source": "Open-Meteo",
+                "data_source": data_source,
+                "imd_station": imd_data.get("station_city") if imd_data else None,
                 "timestamp": datetime.utcnow().isoformat()
             }
 
             return result
 
         except httpx.TimeoutException:
-            logger.error(f"Open-Meteo API timeout for lat={lat}, lng={lng}")
+            logger.error(f"Weather API timeout for lat={lat}, lng={lng}")
             raise Exception("Weather API timeout. Please try again.")
         except httpx.HTTPStatusError as e:
-            logger.error(f"Open-Meteo API error: {e}")
+            logger.error(f"Weather API error: {e}")
             raise Exception("Weather API returned an error.")
         except Exception as e:
             logger.error(f"Failed to fetch weather data: {e}")
@@ -98,142 +122,62 @@ class WeatherService:
             "wind_speed": current.get("wind_speed_10m", 0),
             "wind_direction": current.get("wind_direction_10m", 0),
             "weather_code": current.get("weather_code", 0),
-            "time": current.get("time", datetime.utcnow().isoformat())
+            "description": self.get_weather_description(current.get("weather_code", 0))
         }
 
     def _parse_forecast(self, daily: Dict) -> Dict[str, Any]:
-        """Parse 7-day forecast."""
-        if not daily:
-            return {"days": []}
-
+        """Parse 7-day daily forecast."""
         days = []
         dates = daily.get("time", [])
+        temp_maxs = daily.get("temperature_2m_max", [])
+        temp_mins = daily.get("temperature_2m_min", [])
+        precip_sums = daily.get("precipitation_sum", [])
+        precip_probs = daily.get("precipitation_probability_max", [])
+        wind_speeds = daily.get("wind_speed_10m_max", [])
+        weather_codes = daily.get("weather_code", [])
 
         for i in range(min(7, len(dates))):
-            day = {
-                "date": dates[i],
-                "temperature_max": daily.get("temperature_2m_max", [])[i] if i < len(daily.get("temperature_2m_max", [])) else None,
-                "temperature_min": daily.get("temperature_2m_min", [])[i] if i < len(daily.get("temperature_2m_min", [])) else None,
-                "precipitation_sum": daily.get("precipitation_sum", [])[i] if i < len(daily.get("precipitation_sum", [])) else 0,
-                "precipitation_probability": daily.get("precipitation_probability_max", [])[i] if i < len(daily.get("precipitation_probability_max", [])) else 0,
-                "wind_speed_max": daily.get("wind_speed_10m_max", [])[i] if i < len(daily.get("wind_speed_10m_max", [])) else 0,
-                "weather_code": daily.get("weather_code", [])[i] if i < len(daily.get("weather_code", [])) else 0
+            day_data = {
+                "date": dates[i] if i < len(dates) else "",
+                "temperature_max": temp_maxs[i] if i < len(temp_maxs) else 0,
+                "temperature_min": temp_mins[i] if i < len(temp_mins) else 0,
+                "precipitation_sum": precip_sums[i] if i < len(precip_sums) else 0,
+                "precipitation_probability": precip_probs[i] if i < len(precip_probs) else 0,
+                "wind_speed_max": wind_speeds[i] if i < len(wind_speeds) else 0,
+                "weather_code": weather_codes[i] if i < len(weather_codes) else 0,
+                "description": self.get_weather_description(weather_codes[i]) if i < len(weather_codes) else "Clear"
             }
-            days.append(day)
+            days.append(day_data)
 
-        return {"days": days}
-
-    async def fetch_30_day_outlook(self, lat: float, lng: float) -> Dict[str, Any]:
-        """
-        Fetch extended 30-day weather outlook with accuracy disclaimer.
-        Combines 16-day numerical forecast with seasonal anomaly projections.
-        """
-        # Open-Meteo supports up to 16 days forecast
-        params = {
-            "latitude": lat,
-            "longitude": lng,
-            "daily": [
-                "temperature_2m_max",
-                "temperature_2m_min",
-                "precipitation_sum",
-                "precipitation_probability_max",
-                "wind_speed_10m_max",
-                "weather_code"
-            ],
-            "forecast_days": 16,
-            "timezone": "auto"
+        return {
+            "days": days,
+            "forecast_days": len(days)
         }
-
-        try:
-            async with httpx.AsyncClient(timeout=self.timeout) as client:
-                response = await client.get(self.base_url, params=params)
-                response.raise_for_status()
-                data = response.json()
-
-            daily = data.get("daily", {})
-            dates = daily.get("time", [])
-            days = []
-
-            # Populate initial days from API
-            for i in range(len(dates)):
-                day = {
-                    "date": dates[i],
-                    "day_number": i + 1,
-                    "temperature_max": daily.get("temperature_2m_max", [])[i] if i < len(daily.get("temperature_2m_max", [])) else 32.0,
-                    "temperature_min": daily.get("temperature_2m_min", [])[i] if i < len(daily.get("temperature_2m_min", [])) else 22.0,
-                    "precipitation_sum": daily.get("precipitation_sum", [])[i] if i < len(daily.get("precipitation_sum", [])) else 0.0,
-                    "precipitation_probability": daily.get("precipitation_probability_max", [])[i] if i < len(daily.get("precipitation_probability_max", [])) else 10,
-                    "wind_speed_max": daily.get("wind_speed_10m_max", [])[i] if i < len(daily.get("wind_speed_10m_max", [])) else 15,
-                    "weather_code": daily.get("weather_code", [])[i] if i < len(daily.get("weather_code", [])) else 1,
-                    "confidence": "high" if i < 3 else "moderate" if i < 7 else "low"
-                }
-                days.append(day)
-
-            # Synthesize extended days 17..30 based on trend
-            if days:
-                last_date_str = days[-1]["date"]
-                try:
-                    last_date = datetime.strptime(last_date_str, "%Y-%m-%d")
-                except Exception:
-                    last_date = datetime.utcnow()
-
-                avg_max = sum(d["temperature_max"] for d in days) / len(days)
-                avg_min = sum(d["temperature_min"] for d in days) / len(days)
-
-                from datetime import timedelta
-                for i in range(len(days), 30):
-                    next_date = (last_date + timedelta(days=i - len(days) + 1)).strftime("%Y-%m-%d")
-                    days.append({
-                        "date": next_date,
-                        "day_number": i + 1,
-                        "temperature_max": round(avg_max + ((i % 5) - 2) * 0.5, 1),
-                        "temperature_min": round(avg_min + ((i % 3) - 1) * 0.4, 1),
-                        "precipitation_sum": round(max(0, ((i % 4) - 1) * 1.5), 1),
-                        "precipitation_probability": 15 + ((i * 7) % 35),
-                        "wind_speed_max": 12 + (i % 8),
-                        "weather_code": 1 if (i % 3 == 0) else (2 if i % 3 == 1 else 0),
-                        "confidence": "experimental"
-                    })
-
-            return {
-                "location": {"lat": lat, "lng": lng},
-                "outlook_days": 30,
-                "days": days,
-                "disclaimer": "Extended 30-day outlook is based on statistical climatological projections and numerical models. Lower forecast accuracy beyond day 7; intended for broad seasonal planning purposes only.",
-                "data_source": "Open-Meteo & WeatherGPT Climatological Model",
-                "timestamp": datetime.utcnow().isoformat()
-            }
-        except Exception as e:
-            logger.error(f"Failed to fetch 30-day outlook: {e}")
-            return {
-                "location": {"lat": lat, "lng": lng},
-                "outlook_days": 0,
-                "days": [],
-                "disclaimer": "30-day outlook currently unavailable for these coordinates.",
-                "timestamp": datetime.utcnow().isoformat()
-            }
 
     def classify_severity(self, weather_data: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Classify weather severity based on fixed thresholds:
-        - Wind speed >= 62 km/h: High wind warning
-        - Temperature >= 45C: Extreme heat
-        - Rain probability >= 80% AND accumulation >= 100mm: Heavy rain
-        - Temperature <= 0C: Frost/freeze
+        Classify weather severity and generate alert messages.
         """
-        if not weather_data or not isinstance(weather_data, dict):
-            return {"severity": "normal", "alerts": [], "alert_count": 0}
+        current = weather_data.get("current", {})
+        forecast = weather_data.get("forecast", {}).get("days", [])
 
-        current = weather_data.get("current") or {}
-        forecast_data = weather_data.get("forecast") or {}
-        forecast = forecast_data.get("days", []) if isinstance(forecast_data, dict) else []
+        temp = current.get("temperature", 20)
+        wind_speed = current.get("wind_speed", 0)
+        weather_code = current.get("weather_code", 0)
 
         alerts = []
         severity = "normal"
 
-        # Check current conditions
-        temp = current.get("temperature", 0)
-        wind_speed = current.get("wind_speed", 0)
+        # Severe weather codes (Thunderstorms, Heavy Rain)
+        if weather_code in [95, 96, 99]:
+            alerts.append("Thunderstorm warning: Severe convective activity detected")
+            severity = "severe"
+        elif weather_code in [65, 82]:
+            alerts.append("Heavy rain alert: Risk of localized waterlogging")
+            severity = "severe"
+        elif weather_code in [75, 86]:
+            alerts.append("Heavy snow alert: Hazardous conditions")
+            severity = "severe"
 
         # Temperature alerts
         if temp >= 45:
@@ -275,8 +219,6 @@ class WeatherService:
     def get_weather_description(self, weather_code: int) -> str:
         """
         Convert WMO weather code to human-readable description.
-
-        WMO codes: https://open-meteo.com/en/docs
         """
         descriptions = {
             0: "Clear sky",
@@ -309,32 +251,3 @@ class WeatherService:
 
 # Global instance
 weather_service = WeatherService()
-
-
-if __name__ == "__main__":
-    # Test the service
-    import asyncio
-
-    async def test():
-        # Mumbai coordinates
-        lat, lng = 19.0760, 72.8777
-
-        print(f"Fetching weather for Mumbai (lat={lat}, lng={lng})...")
-        weather = await weather_service.fetch_weather(lat, lng)
-
-        print("\n=== Current Weather ===")
-        print(f"Temperature: {weather['current']['temperature']}°C")
-        print(f"Humidity: {weather['current']['humidity']}%")
-        print(f"Wind: {weather['current']['wind_speed']} km/h")
-
-        print("\n=== Severity Classification ===")
-        severity = weather_service.classify_severity(weather)
-        print(f"Severity: {severity['severity']}")
-        print(f"Alerts: {severity['alerts']}")
-
-        print("\n=== 7-Day Forecast ===")
-        for day in weather['forecast']['days'][:3]:
-            print(f"{day['date']}: {day['temperature_min']}°C - {day['temperature_max']}°C, "
-                  f"{day['precipitation_probability']}% rain")
-
-    asyncio.run(test())
