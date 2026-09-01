@@ -58,6 +58,14 @@ type DashboardWeather = {
   weatherType: WeatherCondition;
   lat: number;
   lng: number;
+  uvIndex?: number;
+  aqi?: number;
+  sunrise?: string;
+  sunset?: string;
+  moonrise?: string;
+  moonPhase?: string;
+  visibility?: number;
+  dewPoint?: number;
   forecast?: ForecastDay[];
 };
 
@@ -75,6 +83,14 @@ export default function Home() {
     weatherType: "clear",
     lat: 28.6139,
     lng: 77.209,
+    uvIndex: 5.6,
+    aqi: 78,
+    sunrise: "05:58 AM",
+    sunset: "06:38 PM",
+    moonrise: "07:15 PM",
+    moonPhase: "Waxing Gibbous",
+    visibility: 10,
+    dewPoint: 21,
     forecast: [],
   });
 
@@ -169,6 +185,14 @@ export default function Home() {
           weatherType: data.weatherType || "clear",
           lat: resolvedLat,
           lng: resolvedLng,
+          uvIndex: data.uvIndex ?? 5.6,
+          aqi: data.aqi ?? 78,
+          sunrise: data.sunrise ?? "05:58 AM",
+          sunset: data.sunset ?? "06:38 PM",
+          moonrise: data.moonrise ?? "07:15 PM",
+          moonPhase: data.moonPhase ?? "Waxing Gibbous",
+          visibility: data.visibility ?? 10,
+          dewPoint: data.dewPoint ?? 21,
           forecast: data.forecast || [],
         });
 
@@ -381,7 +405,7 @@ export default function Home() {
         />
       </div>
 
-      {/* Top Header with Clean Layout, Global Search & Vernacular Language Switcher */}
+      {/* Top Header with Clean Non-Wrapping Layout, Global Search & Vernacular Language Switcher */}
       <Header
         preferences={preferences}
         onSavePreferences={handleSavePreferences}
@@ -428,7 +452,7 @@ export default function Home() {
         }}
       />
 
-      {/* Persistent Main Dashboard Weather Summary Card (Top-Left with Sensor Quick Triggers) */}
+      {/* Persistent Main Dashboard Weather Summary Card (Top-Left with Sensor Quick Triggers and Astro Drawer) */}
       <WeatherSummaryCard
         city={dashboardWeather.city}
         temp={dashboardWeather.temp}
@@ -437,6 +461,15 @@ export default function Home() {
         humidity={dashboardWeather.humidity}
         windSpeed={dashboardWeather.windSpeed}
         pressure={dashboardWeather.pressure}
+        uvIndex={dashboardWeather.uvIndex}
+        aqi={dashboardWeather.aqi}
+        sunrise={dashboardWeather.sunrise}
+        sunset={dashboardWeather.sunset}
+        moonrise={dashboardWeather.moonrise}
+        moonPhase={dashboardWeather.moonPhase}
+        visibility={dashboardWeather.visibility}
+        dewPoint={dashboardWeather.dewPoint}
+        lang={selectedLanguage}
         onRefreshGPS={() => handleGPSDetect(true)}
         isLocating={isLocating}
         onOpenLightning={() => setIsLightningOpen(true)}
@@ -453,6 +486,7 @@ export default function Home() {
           temp={dashboardWeather.temp}
           condition={dashboardWeather.condition}
           rainChance={dashboardWeather.rainChance}
+          lang={selectedLanguage}
         />
       )}
 

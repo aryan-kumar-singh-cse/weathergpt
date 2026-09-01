@@ -2,12 +2,14 @@
 
 import React from "react";
 import { CloudRain, MapPin } from "lucide-react";
+import { SupportedLanguage, TRANSLATIONS, translateCondition } from "@/lib/translations";
 
 type Props = {
   city: string;
   temp: number;
   condition: string;
   rainChance?: number;
+  lang?: SupportedLanguage;
 };
 
 export default function InfoStrip({
@@ -15,7 +17,11 @@ export default function InfoStrip({
   temp,
   condition,
   rainChance,
+  lang = "en",
 }: Props) {
+  const t = TRANSLATIONS[lang] || TRANSLATIONS.en;
+  const translatedCondition = translateCondition(condition, lang);
+
   return (
     <div
       className="absolute top-28 md:top-24 left-1/2 -translate-x-1/2 z-20
@@ -39,8 +45,8 @@ export default function InfoStrip({
 
       <span className="text-yellow-400/30 select-none">|</span>
 
-      <span className="text-xs md:text-sm text-gray-300 truncate max-w-[140px] capitalize">
-        {condition}
+      <span className="text-xs md:text-sm text-yellow-300/90 truncate max-w-[160px] capitalize">
+        {translatedCondition}
       </span>
 
       {rainChance !== undefined && (
@@ -48,7 +54,7 @@ export default function InfoStrip({
           <span className="text-yellow-400/30 select-none">|</span>
           <div className="flex items-center gap-1.5 text-xs md:text-sm text-cyan-400 font-semibold">
             <CloudRain className="w-3.5 h-3.5" />
-            <span>{rainChance}% rain</span>
+            <span>{rainChance}% {t.rain}</span>
           </div>
         </>
       )}
