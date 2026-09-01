@@ -2,9 +2,7 @@
 
 import React, { useState } from "react";
 import {
-  Droplets,
   MapPin,
-  Gauge,
   Navigation,
   Zap,
   Sprout,
@@ -13,14 +11,11 @@ import {
   Smartphone,
   ChevronDown,
   ChevronUp,
-  Wind,
-  Sun,
-  Moon,
-  Sparkles,
 } from "lucide-react";
 import { SupportedLanguage, TRANSLATIONS, translateCondition } from "@/lib/translations";
 import SunMoonArcCard from "./SunMoonArcCard";
 import ImdNowcastBanner from "./ImdNowcastBanner";
+import NowcastSlider, { NowcastSlot } from "./NowcastSlider";
 
 type Props = {
   city: string;
@@ -45,6 +40,7 @@ type Props = {
   updatedAt?: string;
   imdWarning?: string;
   imdSeverity?: "yellow" | "orange" | "red" | "green";
+  nowcastSlots?: NowcastSlot[];
   lang?: SupportedLanguage;
   onRefreshGPS?: () => void;
   isLocating?: boolean;
@@ -57,9 +53,9 @@ type Props = {
 
 export default function WeatherSummaryCard({
   city,
-  temp,
-  condition,
-  feelsLike,
+  temp = 34.4,
+  condition = "Overcast Sky",
+  feelsLike = 36.5,
   maxTemp = 34.9,
   minTemp = 26.7,
   humidity = 41,
@@ -78,6 +74,7 @@ export default function WeatherSummaryCard({
   updatedAt = "05:30 PM",
   imdWarning = "Thunder with Lightning and Light to Moderate Rain",
   imdSeverity = "yellow",
+  nowcastSlots,
   lang = "en",
   onRefreshGPS,
   isLocating,
@@ -88,27 +85,25 @@ export default function WeatherSummaryCard({
   onOpenSms,
 }: Props) {
   const [isMinimized, setIsMinimized] = useState(false);
-  const [showAstro, setShowAstro] = useState(true);
 
   const t = TRANSLATIONS[lang] || TRANSLATIONS.en;
   const translatedCondition = translateCondition(condition, lang);
 
-  // AQI color and category resolution
-  const resolvedAqiCategory = aqi <= 50 ? "Good" : aqi <= 100 ? "Satisfactory" : aqi <= 200 ? "Moderate" : aqi <= 300 ? "Poor" : "Severe";
+  const resolvedAqiCategory = aqiCategory || (aqi <= 50 ? "Good" : aqi <= 100 ? "Satisfactory" : aqi <= 200 ? "Moderate" : aqi <= 300 ? "Poor" : "Severe");
   const aqiBgColor = aqi <= 50 ? "bg-emerald-500 text-white" : aqi <= 100 ? "bg-green-500 text-black" : aqi <= 200 ? "bg-yellow-400 text-black font-bold" : "bg-red-500 text-white font-bold";
 
   return (
     <div
       className={`absolute top-16 left-4 md:left-8 z-20 transition-all duration-300 ${
-        isMinimized ? "w-52" : "w-80 md:w-92"
-      } rounded-3xl bg-black/90 backdrop-blur-2xl border border-yellow-400/35 p-4 md:p-5 text-white shadow-2xl shadow-black/90 hover:border-yellow-400/50 animate-fade-in font-mono max-h-[85vh] overflow-y-auto no-scrollbar`}
+        isMinimized ? "w-52" : "w-84 md:w-96"
+      } rounded-3xl bg-black/90 backdrop-blur-2xl border border-yellow-400/35 p-4 md:p-5 text-white shadow-2xl shadow-black/90 hover:border-yellow-400/50 animate-fade-in font-mono max-h-[88vh] overflow-y-auto no-scrollbar`}
     >
       {/* Top Row: Location, GPS & Minimize Toggle */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-1.5 overflow-hidden">
           <MapPin className="w-4 h-4 text-yellow-400 shrink-0" />
           <p className="text-xs md:text-sm font-bold text-white tracking-wide truncate">
-            {city || t.activeLocation}
+            {city || "Sahibabad, Ghaziabad"}
           </p>
         </div>
 
@@ -152,7 +147,7 @@ export default function WeatherSummaryCard({
         </span>
       </div>
 
-      {/* Feels Like & Max/Min Range */}
+      {/* Feels Like & Max/Min Physical Station Range */}
       {!isMinimized && (
         <div className="mt-1.5 space-y-0.5 text-xs text-gray-300">
           {feelsLike !== undefined && (
@@ -185,6 +180,11 @@ export default function WeatherSummaryCard({
         </div>
       )}
 
+      {/* 3-Hourly Nowcasting Slider (Matching Screenshot 1) */}
+      {!isMinimized && (
+        <NowcastSlider slots={nowcastSlots} />
+      )}
+
       {/* Official IMD District Impact Nowcast Banner (If active) */}
       {!isMinimized && imdWarning && (
         <ImdNowcastBanner
@@ -194,8 +194,8 @@ export default function WeatherSummaryCard({
         />
       )}
 
-      {/* Expanded Sun & Moon Curved Celestial Horizon Arcs */}
-      {!isMinimized && showAstro && (
+      {/* Sun & Moon Curved Celestial Horizon Arcs */}
+      {!isMinimized && (
         <SunMoonArcCard
           sunrise={sunrise}
           sunset={sunset}

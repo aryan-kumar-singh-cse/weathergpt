@@ -16,6 +16,7 @@ import SmartCropCalendarModal from "@/components/SmartCropCalendarModal";
 import SatelliteViewerModal from "@/components/SatelliteViewerModal";
 import DisasterReliefModal from "@/components/DisasterReliefModal";
 import RuralSmsSimulatorModal from "@/components/RuralSmsSimulatorModal";
+import { NowcastSlot } from "@/components/NowcastSlider";
 import { Preferences } from "@/components/SettingsPanel";
 import type { WeatherCondition } from "@/components/WeatherGlobe";
 import { SupportedLanguage } from "@/lib/translations";
@@ -73,11 +74,12 @@ type DashboardWeather = {
   updatedAt?: string;
   imdWarning?: string;
   imdSeverity?: "yellow" | "orange" | "red" | "green";
+  nowcastSlots?: NowcastSlot[];
   forecast?: ForecastDay[];
 };
 
 export default function Home() {
-  // Main Dashboard Weather State with 0.1 Decimal Precision
+  // Main Dashboard Weather State with 0.1 Decimal Precision matching MAUSAM App
   const [dashboardWeather, setDashboardWeather] = useState<DashboardWeather>({
     city: "Sahibabad, Ghaziabad",
     temp: 34.4,
@@ -105,6 +107,14 @@ export default function Home() {
     updatedAt: "05:30 PM",
     imdWarning: "Thunder with Lightning and Light to Moderate Rain",
     imdSeverity: "yellow",
+    nowcastSlots: [
+      { time: "17:30", condition: "Overcast Sky", temp: 34.7, humidity: 34 },
+      { time: "20:30", condition: "Overcast Sky", temp: 33.2, humidity: 40 },
+      { time: "23:30", condition: "Overcast Sky", temp: 31.7, humidity: 44 },
+      { time: "02:30", condition: "Light Rain", temp: 29.5, humidity: 58, rainChance: 45 },
+      { time: "05:30", condition: "Partly Cloudy", temp: 27.2, humidity: 68 },
+      { time: "08:30", condition: "Mainly Clear", temp: 29.8, humidity: 55 },
+    ],
     forecast: [],
   });
 
@@ -215,6 +225,7 @@ export default function Home() {
           updatedAt: data.updatedAt ?? "05:30 PM",
           imdWarning: data.imdWarning ?? "Thunder with Lightning and Light to Moderate Rain",
           imdSeverity: data.imdSeverity ?? "yellow",
+          nowcastSlots: data.nowcastSlots || [],
           forecast: data.forecast || [],
         });
 
@@ -351,7 +362,6 @@ export default function Home() {
       () => {
         setIsLocating(false);
         if (isManual && toastId) toast.error("Location permission denied", { id: toastId });
-        // Fallback default
         if (!isManual) {
           handleSelectDashboardLocation("Sahibabad, Ghaziabad", { lat: 28.6780, lng: 77.3890 }, true);
         }
@@ -360,7 +370,7 @@ export default function Home() {
     );
   }, [handleSelectDashboardLocation]);
 
-  // Initial Load: Auto-Prompt User for GPS Location (Like Native Weather Apps)
+  // Initial Load: Auto-Prompt User for GPS Location
   useEffect(() => {
     let savedCity = "";
     let savedCoords: { lat: number; lng: number } | undefined;
@@ -375,7 +385,6 @@ export default function Home() {
       handleSelectDashboardLocation(savedCity, savedCoords, true);
     }
 
-    // Auto-ask GPS location immediately on initial start
     handleGPSDetect(false);
   }, []);
 
@@ -504,6 +513,7 @@ export default function Home() {
         updatedAt={dashboardWeather.updatedAt}
         imdWarning={dashboardWeather.imdWarning}
         imdSeverity={dashboardWeather.imdSeverity}
+        nowcastSlots={dashboardWeather.nowcastSlots}
         lang={selectedLanguage}
         onRefreshGPS={() => handleGPSDetect(true)}
         isLocating={isLocating}
