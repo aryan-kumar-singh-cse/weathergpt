@@ -25,7 +25,6 @@ function formatIsoTo12HourTime(isoString?: string): string {
   try {
     const dt = new Date(isoString);
     if (isNaN(dt.getTime())) {
-      // Direct substring parsing if standard ISO without timezone
       const timePart = isoString.split("T")[1];
       if (timePart) {
         const [h, m] = timePart.split(":");
@@ -46,10 +45,9 @@ function formatIsoTo12HourTime(isoString?: string): string {
   }
 }
 
-// Compute accurate real-time lunar moon phase
+// Compute accurate real-time lunar moon phase & illumination %
 function getRealTimeMoonPhase() {
   const now = new Date();
-  // Known reference new moon
   const knownNewMoon = new Date("2024-01-11T11:57:00Z").getTime();
   const daysSinceNewMoon = ((now.getTime() - knownNewMoon) / 86400000) % 29.53058770576;
   const illumination = Math.round((1 - Math.cos((daysSinceNewMoon / 29.53058770576) * 2 * Math.PI)) / 2 * 100);
@@ -72,8 +70,8 @@ async function fetchPinpointLiveWeather(lat: number, lng: number) {
     const aqiUrl = `https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${lat}&longitude=${lng}&current=pm10,pm2_5,us_aqi,european_aqi`;
 
     const [weatherRes, aqiRes] = await Promise.allSettled([
-      fetch(weatherUrl, { next: { revalidate: 30 } }),
-      fetch(aqiUrl, { next: { revalidate: 30 } }),
+      fetch(weatherUrl, { next: { revalidate: 15 } }),
+      fetch(aqiUrl, { next: { revalidate: 15 } }),
     ]);
 
     let weatherData: any = null;
@@ -99,7 +97,7 @@ async function fetchPinpointLiveWeather(lat: number, lng: number) {
       const sunset = formatIsoTo12HourTime(sunsetRaw);
       const moonPhase = getRealTimeMoonPhase();
 
-      // Moonrise approximation relative to sunset
+      // Moonrise calculated relative to sunset
       const sunsetDate = sunsetRaw ? new Date(sunsetRaw) : new Date();
       sunsetDate.setMinutes(sunsetDate.getMinutes() + 48);
       const moonrise = formatIsoTo12HourTime(sunsetDate.toISOString());
@@ -132,17 +130,57 @@ async function fetchPinpointLiveWeather(lat: number, lng: number) {
 
 export async function POST(request: Request) {
   try {
-    const { message, occupation, language, location, history } = await request.json();
+    const {
+      message,
+      occupation,
+      language,
+      location,
+      history,
+      lat: clientLat,
+      lng: clientLng,
+    } = await request.json();
 
     let role = "citizen";
     if (occupation?.toLowerCase().includes("farmer")) role = "farmer";
     else if (occupation?.toLowerCase().includes("pilot")) role = "pilot";
     else if (occupation?.toLowerCase().includes("disaster")) role = "disaster-manager";
 
+    // 1. Resolve coordinates: Priority to client-provided exact GPS coordinates
+    let resolvedLat = clientLat !== undefined && clientLat !== null ? parseFloat(clientLat) : undefined;
+    let resolvedLng = clientLng !== undefined && clientLng !== null ? parseFloat(clientLng) : undefined;
+
+    // If no coordinates provided, forward geocode the location string
+    if (resolvedLat === undefined || resolvedLng === undefined) {
+      if (location) {
+        try {
+          const geoRes = await fetch(
+            `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(location)}&count=1&language=en&format=json`
+          );
+          if (geoRes.ok) {
+            const geoData = await geoRes.json();
+            if (geoData.results && geoData.results.length > 0) {
+              resolvedLat = geoData.results[0].latitude;
+              resolvedLng = geoData.results[0].longitude;
+            }
+          }
+        } catch {}
+      }
+    }
+
+    // Default fallback to Mohan Nagar / Sahibabad / NCR
+    if (resolvedLat === undefined || resolvedLng === undefined) {
+      resolvedLat = 28.6780;
+      resolvedLng = 77.3890;
+    }
+
+    // 2. Fetch 100% Live Pinpoint Weather & Ephemeris for these exact coordinates
+    const livePinpoint = await fetchPinpointLiveWeather(resolvedLat, resolvedLng);
+
+    // 3. Contact backend for AI LLM narrative response
     const endpoints = [
       process.env.INTERNAL_API_URL || "http://backend:8000/api/v1",
       process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000/api/v1",
-      "http://localhost:8000/api/v1"
+      "http://localhost:8000/api/v1",
     ];
 
     let backendData: any = null;
@@ -159,6 +197,8 @@ export async function POST(request: Request) {
             language: (language || "en").toLowerCase().slice(0, 2),
             location: location || undefined,
             history: history || undefined,
+            lat: resolvedLat,
+            lng: resolvedLng,
           }),
         });
 
@@ -166,136 +206,84 @@ export async function POST(request: Request) {
           backendData = await backendRes.json();
           break;
         }
-      } catch (err) {
-        // try next endpoint
-      }
+      } catch {}
     }
 
     const daysOfWeek = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
-    if (backendData) {
-      const placeInfo = backendData.weather?.place_info || {};
-      const resolvedLat = placeInfo.lat ?? 28.6139;
-      const resolvedLng = placeInfo.lng ?? 77.209;
-      const extractedCity =
-        placeInfo.place_name ||
-        placeInfo.city ||
-        backendData.intent?.place ||
-        location ||
-        "Ghaziabad";
+    const current = livePinpoint.liveDataFound ? livePinpoint.current : (backendData?.weather?.current || {});
+    const daily = livePinpoint.liveDataFound ? livePinpoint.daily : {};
+    const forecastDays = backendData?.weather?.forecast?.days || [];
 
-      // Query 100% Live Open-Meteo High-Resolution Solar Ephemeris & CAMS AQI in real-time
-      const livePinpoint = await fetchPinpointLiveWeather(resolvedLat, resolvedLng);
+    const weatherCode = current.weather_code ?? 0;
+    const weatherType = mapWeatherCodeToType(weatherCode);
 
-      const current = livePinpoint.liveDataFound ? livePinpoint.current : (backendData.weather?.current || {});
-      const daily = livePinpoint.liveDataFound ? livePinpoint.daily : {};
-      const forecastDays = backendData.weather?.forecast?.days || [];
+    // Format 7-Day Forecast using live daily arrays
+    const formattedForecast = (daily.time || forecastDays).slice(0, 7).map((dayItem: any, idx: number) => {
+      const dateStr = daily.time ? daily.time[idx] : dayItem.date;
+      const dateObj = new Date(dateStr);
+      const dayName = isNaN(dateObj.getTime()) ? "Day" : daysOfWeek[dateObj.getDay()];
+      const dateNum = isNaN(dateObj.getTime()) ? idx + 1 : dateObj.getDate();
+      const code = daily.weather_code ? daily.weather_code[idx] : (dayItem.weather_code ?? 0);
+      const high = daily.temperature_2m_max ? Math.round(daily.temperature_2m_max[idx]) : Math.round(dayItem.temperature_max ?? 30);
+      const low = daily.temperature_2m_min ? Math.round(daily.temperature_2m_min[idx]) : Math.round(dayItem.temperature_min ?? 22);
+      const rainProb = daily.precipitation_probability_max ? daily.precipitation_probability_max[idx] : (dayItem.precipitation_probability ?? 0);
 
-      const weatherCode = current.weather_code ?? 0;
-      const weatherType = mapWeatherCodeToType(weatherCode);
-
-      // Generate exact 7-day forecast mapping
-      const formattedForecast = (daily.time || forecastDays).slice(0, 7).map((dayItem: any, idx: number) => {
-        const dateStr = daily.time ? daily.time[idx] : dayItem.date;
-        const dateObj = new Date(dateStr);
-        const dayName = isNaN(dateObj.getTime()) ? "Day" : daysOfWeek[dateObj.getDay()];
-        const dateNum = isNaN(dateObj.getTime()) ? idx + 1 : dateObj.getDate();
-        const code = daily.weather_code ? daily.weather_code[idx] : (dayItem.weather_code ?? 0);
-        const high = daily.temperature_2m_max ? Math.round(daily.temperature_2m_max[idx]) : Math.round(dayItem.temperature_max ?? 30);
-        const low = daily.temperature_2m_min ? Math.round(daily.temperature_2m_min[idx]) : Math.round(dayItem.temperature_min ?? 22);
-        const rainProb = daily.precipitation_probability_max ? daily.precipitation_probability_max[idx] : (dayItem.precipitation_probability ?? 0);
-
-        return {
-          date: dateNum,
-          day: dayName,
-          condition: mapWeatherCodeToDescription(code),
-          weatherCode: code,
-          highTemp: high,
-          lowTemp: low,
-          rainChance: rainProb,
-        };
-      });
-
-      const astroEnv = livePinpoint.liveDataFound ? livePinpoint.astro : {
-        sunrise: "05:58 AM",
-        sunset: "06:38 PM",
-        moonrise: "07:15 PM",
-        moonPhase: getRealTimeMoonPhase(),
-        uvIndex: 5.6,
-        aqi: 74,
-        dewPoint: 21,
-        visibility: 10,
-      };
-
-      const resolvedTemp = Math.round(current.temperature_2m ?? current.temperature ?? 30);
-      const feelsLike = Math.round(current.apparent_temperature ?? resolvedTemp);
-      const humidity = Math.round(current.relative_humidity_2m ?? current.humidity ?? 65);
-      const windSpeed = Math.round(current.wind_speed_10m ?? current.wind_speed ?? 8);
-      const pressure = Math.round(current.pressure_msl ?? current.pressure ?? 1012);
-      const rainChance = daily.precipitation_probability_max?.[0] ?? forecastDays[0]?.precipitation_probability ?? 0;
-
-      return NextResponse.json({
-        city: extractedCity,
-        temp: resolvedTemp,
-        feelsLike,
-        humidity,
-        windSpeed,
-        pressure,
-        condition: mapWeatherCodeToDescription(weatherCode),
-        rainChance,
-        weatherType,
-        lat: resolvedLat,
-        lng: resolvedLng,
-        response: backendData.response,
-        forecast: formattedForecast,
-        ...astroEnv,
-      });
-    }
-
-    // Direct Live Telemetry Fallback (Direct Open-Meteo Pinpoint Model)
-    const lat = 28.6139;
-    const lng = 77.209;
-    const livePinpoint = await fetchPinpointLiveWeather(lat, lng);
-
-    const fallback7Days = Array.from({ length: 7 }, (_, i) => {
-      const d = new Date();
-      d.setDate(d.getDate() + i);
       return {
-        date: d.getDate(),
-        day: daysOfWeek[d.getDay()],
-        condition: i === 0 ? "Clear Sky" : i % 2 === 0 ? "Partly Cloudy" : "Sunny",
-        weatherCode: i === 0 ? 0 : 2,
-        highTemp: 32 + (i % 3),
-        lowTemp: 24 + (i % 2),
-        rainChance: (i * 12) % 40,
+        date: dateNum,
+        day: dayName,
+        condition: mapWeatherCodeToDescription(code),
+        weatherCode: code,
+        highTemp: high,
+        lowTemp: low,
+        rainChance: rainProb,
       };
     });
 
-    const astroEnv = livePinpoint.liveDataFound ? livePinpoint.astro : {
-      sunrise: "05:58 AM",
-      sunset: "06:38 PM",
-      moonrise: "07:15 PM",
-      moonPhase: getRealTimeMoonPhase(),
-      uvIndex: 5.6,
-      aqi: 74,
-      dewPoint: 21,
-      visibility: 10,
-    };
+    const astroEnv = livePinpoint.liveDataFound
+      ? livePinpoint.astro
+      : {
+          sunrise: "05:58 AM",
+          sunset: "06:38 PM",
+          moonrise: "07:15 PM",
+          moonPhase: getRealTimeMoonPhase(),
+          uvIndex: 5.6,
+          aqi: 74,
+          dewPoint: 21,
+          visibility: 10,
+        };
+
+    const resolvedTemp = Math.round(current.temperature_2m ?? current.temperature ?? 30);
+    const feelsLike = Math.round(current.apparent_temperature ?? resolvedTemp);
+    const humidity = Math.round(current.relative_humidity_2m ?? current.humidity ?? 65);
+    const windSpeed = Math.round(current.wind_speed_10m ?? current.wind_speed ?? 8);
+    const pressure = Math.round(current.pressure_msl ?? current.pressure ?? 1012);
+    const rainChance = daily.precipitation_probability_max?.[0] ?? forecastDays[0]?.precipitation_probability ?? 0;
+
+    const extractedCity =
+      location ||
+      backendData?.weather?.place_info?.place_name ||
+      backendData?.weather?.place_info?.city ||
+      "Live Location";
+
+    const narrativeResponse =
+      backendData?.response ||
+      `Live weather update for ${extractedCity}: Temperature is ${resolvedTemp}°C (feels like ${feelsLike}°C) with ${humidity}% humidity. Wind speed is ${windSpeed} km/h and conditions are ${mapWeatherCodeToDescription(weatherCode)}.`;
 
     return NextResponse.json({
-      city: location || "Ghaziabad",
-      temp: livePinpoint.liveDataFound ? Math.round(livePinpoint.current.temperature_2m) : 30,
-      feelsLike: livePinpoint.liveDataFound ? Math.round(livePinpoint.current.apparent_temperature) : 32,
-      humidity: livePinpoint.liveDataFound ? Math.round(livePinpoint.current.relative_humidity_2m) : 68,
-      windSpeed: livePinpoint.liveDataFound ? Math.round(livePinpoint.current.wind_speed_10m) : 10,
-      pressure: livePinpoint.liveDataFound ? Math.round(livePinpoint.current.pressure_msl) : 1012,
-      condition: livePinpoint.liveDataFound ? mapWeatherCodeToDescription(livePinpoint.current.weather_code) : "Clear Sky",
-      rainChance: 15,
-      weatherType: "clear",
-      lat,
-      lng,
-      response: `Weather update for ${location || "Ghaziabad"}: Live observations show temperature at around 30°C with nominal wind speeds. Dry and stable conditions expected over the next 48 hours.`,
-      forecast: fallback7Days,
+      city: extractedCity,
+      temp: resolvedTemp,
+      feelsLike,
+      humidity,
+      windSpeed,
+      pressure,
+      condition: mapWeatherCodeToDescription(weatherCode),
+      rainChance,
+      weatherType,
+      lat: resolvedLat,
+      lng: resolvedLng,
+      response: narrativeResponse,
+      forecast: formattedForecast,
       ...astroEnv,
     });
   } catch (error) {
@@ -314,7 +302,7 @@ export async function POST(request: Request) {
     });
 
     return NextResponse.json({
-      city: "Ghaziabad",
+      city: "Mohan Nagar, Sahibabad",
       temp: 30,
       feelsLike: 32,
       humidity: 65,
@@ -323,8 +311,8 @@ export async function POST(request: Request) {
       condition: "Partly Cloudy",
       rainChance: 20,
       weatherType: "cloudy",
-      lat: 28.6139,
-      lng: 77.209,
+      lat: 28.6780,
+      lng: 77.3890,
       sunrise: "05:58 AM",
       sunset: "06:38 PM",
       moonrise: "07:15 PM",

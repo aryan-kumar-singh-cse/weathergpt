@@ -81,8 +81,8 @@ export default function Home() {
     condition: "Clear Sky",
     rainChance: 15,
     weatherType: "clear",
-    lat: 28.6139,
-    lng: 77.209,
+    lat: 28.6780,
+    lng: 77.3890,
     uvIndex: 5.6,
     aqi: 78,
     sunrise: "05:58 AM",
@@ -94,7 +94,7 @@ export default function Home() {
     forecast: [],
   });
 
-  const [globeCoords, setGlobeCoords] = useState({ lat: 28.6139, lng: 77.209 });
+  const [globeCoords, setGlobeCoords] = useState({ lat: 28.6780, lng: 77.3890 });
   const [detailedDays15, setDetailedDays15] = useState<DetailedDay[]>([]);
   const [isForecastOpen, setIsForecastOpen] = useState(false);
   const [isChatExpanded, setIsChatExpanded] = useState(false);
@@ -140,7 +140,7 @@ export default function Home() {
         setGlobeCoords({ lat: coords.lat, lng: coords.lng });
       }
 
-      // Persist active city and coordinates in localStorage so refresh never resets to Delhi!
+      // Persist active city and coordinates in localStorage
       try {
         localStorage.setItem("weathergpt_active_city", cityName);
         if (coords) {
@@ -150,7 +150,7 @@ export default function Home() {
 
       let toastId: string | undefined;
       if (!isSilentSync) {
-        toastId = toast.loading(`Loading weather data for ${cityName}...`);
+        toastId = toast.loading(`Loading live weather for ${cityName}...`);
       } else {
         setIsRefreshing(true);
       }
@@ -164,14 +164,16 @@ export default function Home() {
             occupation: preferences.occupation,
             language: activeLang,
             location: cityName,
+            lat: coords?.lat ?? globeCoords.lat,
+            lng: coords?.lng ?? globeCoords.lng,
           }),
         });
 
         if (!res.ok) throw new Error("Could not fetch location weather");
         const data = await res.json();
 
-        const resolvedLat = data.lat ?? coords?.lat ?? 28.61;
-        const resolvedLng = data.lng ?? coords?.lng ?? 77.2;
+        const resolvedLat = data.lat ?? coords?.lat ?? globeCoords.lat;
+        const resolvedLng = data.lng ?? coords?.lng ?? globeCoords.lng;
 
         setDashboardWeather({
           city: data.city || cityName,
@@ -222,7 +224,7 @@ export default function Home() {
 
         setLastSyncedSecondsAgo(0);
         if (toastId) {
-          toast.success(`Dashboard viewing ${data.city || cityName}`, { id: toastId });
+          toast.success(`Viewing live ${data.city || cityName}`, { id: toastId });
         }
       } catch (err: any) {
         if (toastId) {
@@ -232,7 +234,7 @@ export default function Home() {
         setIsRefreshing(false);
       }
     },
-    [preferences.occupation, selectedLanguage]
+    [preferences.occupation, selectedLanguage, globeCoords.lat, globeCoords.lng]
   );
 
   // Auto-Refresh Polling Engine (Every 2.5 minutes + 1s seconds counter)
@@ -276,6 +278,8 @@ export default function Home() {
             occupation: preferences.occupation,
             language: selectedLanguage,
             location: dashboardWeather.city || "Live Location",
+            lat: dashboardWeather.lat,
+            lng: dashboardWeather.lng,
             history: formattedHistory,
           }),
         });
@@ -291,10 +295,10 @@ export default function Home() {
         setIsChatLoading(false);
       }
     },
-    [preferences, selectedLanguage, dashboardWeather.city]
+    [preferences, selectedLanguage, dashboardWeather.city, dashboardWeather.lat, dashboardWeather.lng]
   );
 
-  // 3. Live GPS Geolocation Trigger (Silent on mount, toast when manual)
+  // 3. Live GPS Geolocation Trigger (Hyper-local precision down to neighborhood / colony)
   const handleGPSDetect = useCallback((isManual = true) => {
     if (!navigator.geolocation) {
       if (isManual) toast.error("Geolocation is not supported by your browser");
@@ -304,7 +308,7 @@ export default function Home() {
     setIsLocating(true);
     let toastId: string | undefined;
     if (isManual) {
-      toastId = toast.loading("Detecting your exact GPS location...");
+      toastId = toast.loading("Detecting exact GPS locality...");
     }
 
     navigator.geolocation.getCurrentPosition(
@@ -312,10 +316,10 @@ export default function Home() {
         try {
           const { latitude, longitude } = pos.coords;
           const geo = await reverseGeocode(latitude, longitude);
-          const detectedCity = geo.city || "Ghaziabad";
+          const detectedCity = geo.city || "Mohan Nagar, Sahibabad";
 
           setPreferences((prev) => ({ ...prev, defaultLocation: detectedCity }));
-          if (toastId) toast.success(`Located in ${detectedCity}`, { id: toastId });
+          if (toastId) toast.success(`Located at ${detectedCity}`, { id: toastId });
 
           handleSelectDashboardLocation(detectedCity, { lat: latitude, lng: longitude });
         } catch {
@@ -328,7 +332,7 @@ export default function Home() {
         setIsLocating(false);
         if (toastId) toast.error("Location permission denied", { id: toastId });
       },
-      { enableHighAccuracy: true, timeout: 10000 }
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
     );
   }, [handleSelectDashboardLocation]);
 
@@ -343,10 +347,10 @@ export default function Home() {
       if (coordsStr) savedCoords = JSON.parse(coordsStr);
     } catch {}
 
-    if (savedCity) {
+    if (savedCity && savedCoords) {
       handleSelectDashboardLocation(savedCity, savedCoords);
     } else {
-      // If no cached city, auto-detect user's real location via GPS
+      // Auto-detect user's exact hyper-local position on first load
       handleGPSDetect(false);
     }
   }, []);
@@ -452,7 +456,7 @@ export default function Home() {
         }}
       />
 
-      {/* Persistent Main Dashboard Weather Summary Card (Top-Left with Sensor Quick Triggers and Astro Drawer) */}
+      {/* Persistent Main Dashboard Weather Summary Card */}
       <WeatherSummaryCard
         city={dashboardWeather.city}
         temp={dashboardWeather.temp}

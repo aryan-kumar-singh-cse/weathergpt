@@ -112,30 +112,30 @@ export async function askWeatherQuestion(
   })
 
   if (!response.ok) {
-    const error = await response.json().catch(() => ({ detail: 'Request failed' }))
-    throw new Error(error.detail || 'Failed to fetch weather response')
+    const error = await response.json().catch(() => ({ detail: 'Failed to process request' }))
+    throw new Error(error.detail || 'Failed to process request')
   }
 
   return response.json()
 }
 
 /**
- * Get current weather for city
+ * Get current weather for a city
  */
-export async function getCurrentWeatherByCity(city: string): Promise<any> {
+export async function getCurrentWeather(city: string) {
   const response = await fetch(
     `${API_BASE}/weather/current?city=${encodeURIComponent(city)}`
   )
 
   if (!response.ok) {
-    throw new Error(`Failed to fetch weather for ${city}`)
+    throw new Error('Failed to fetch current weather')
   }
 
   return response.json()
 }
 
 /**
- * Get 7-day daily forecast
+ * Get daily forecast
  */
 export async function getDailyForecast(
   lat: number,
@@ -177,12 +177,20 @@ export async function get30DayOutlook(
 }
 
 /**
- * Reverse geocode GPS coordinates to city name
+ * Reverse geocode GPS coordinates to hyper-local neighborhood / locality name
  */
 export async function reverseGeocode(
   lat: number,
   lng: number
 ): Promise<{ city: string; state?: string; country?: string; display_name?: string }> {
+  try {
+    const res = await fetch(`/api/geocode?lat=${lat}&lng=${lng}`);
+    if (res.ok) {
+      const data = await res.json();
+      if (data && data.city) return data;
+    }
+  } catch {}
+
   const response = await fetch(
     `${API_BASE}/weather/reverse-geocode?lat=${lat}&lng=${lng}`
   )
@@ -193,4 +201,3 @@ export async function reverseGeocode(
 
   return response.json()
 }
-
