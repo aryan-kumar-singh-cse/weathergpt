@@ -453,6 +453,8 @@ export default function Home() {
           lat={globeCoords.lat}
           lng={globeCoords.lng}
           weatherCondition={dashboardWeather.weatherType}
+          cityName={dashboardWeather.city}
+          onSelectLocation={() => setIsSatelliteOpen(true)}
         />
       </div>
 
