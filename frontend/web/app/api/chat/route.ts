@@ -360,6 +360,10 @@ function generateIntelligentConversationalResponse(
     }
     return `🟢 **No severe weather warnings active for ${city}.**\n\nCurrent atmospheric state is normal under **${condition}** with temperature **${temp}°C** and light winds.`;
   }
+  // 16. Greetings & General Identity
+  if (/^(hi|hello|hey|namaste|good morning|good evening|who are you|help|what can you do)/.test(q)) {
+    return `👋 **Namaste! I am WeatherGPT**, your real-time sovereign meteorological intelligence assistant.\n\nCurrently in **${city}**, the weather is **${condition}** at **${temp}°C** (feels like **${feelsLike}°C**) with **${humidity}%** humidity and **${rainChance}%** rain chance.\n\nYou can ask me anything about:\n- 🌧️ Rain & Umbrella advice\n- 🏃 Outdoor activities, running & sports\n- 📅 Tomorrow and 7-day forecasts\n- 💨 Wind, humidity & heat index\n- 🍃 Air Quality (AQI) & UV index\n- 🌾 Agricultural crop & spraying advisories\n- 🕒 Best time to go outside\n- ✈️ Aviation & drone flying conditions`;
+  }
 
   // 17. Suitable Time to Go Out / Best Time to Step Outside
   if (/time to go out|when to go out|best time|suitable time|good time|when should i leave|safe to go out/.test(q)) {
@@ -378,8 +382,19 @@ function generateIntelligentConversationalResponse(
     return `📊 **Comprehensive Meteorological Deep-Dive for ${city}**:\n\n- **Atmospheric Thermodynamics**: Ambient **${temp}°C**, Apparent Heat Index **${feelsLike}°C**, Dew Point **${astroEnv?.dewPoint ?? 21.0}°C**.\n- **Precipitation Envelope**: 24-hr probability is **${rainChance}%** with atmospheric pressure at **${pressure} hPa**.\n- **Air Quality & Dispersion**: CPCB NAQI **${astroEnv?.aqi ?? 105} (${astroEnv?.aqiCategory ?? "Moderate"})** under surface ventilation of **${windSpeed} km/h**.\n- **Horizon Ephemeris**: Sunrise at **${astroEnv?.sunrise ?? "05:58"} IST**, Sunset at **${astroEnv?.sunset ?? "18:43"} IST**, Moon Phase **${astroEnv?.moonPhase ?? "Waxing Crescent"}**.\n\nAsk me about tomorrow's outlook, agricultural spraying suitability, or aviation runway crosswinds!`;
   }
 
+  // 19. Drone / Photography / Outdoor Activity Safety
+  if (/drone|fly|kite|photography|photo|picnic|outing|outdoor|safe to go|travel|commute|drive|driving/.test(q)) {
+    const droneOk = windSpeed <= 20 && rainChance <= 40 && !/rain|storm|thunder/i.test(condition);
+    return `🚁 **Outdoor & Drone Activity Assessment for ${city}**:\n\n${droneOk ? "✅ **Conditions are favorable** for outdoor activities, drone flights, and photography." : "⚠️ **Exercise caution.** Current conditions may not be ideal due to wind, rain probability, or weather patterns."}\n\n- **Sky**: **${condition}**\n- **Wind Speed**: **${windSpeed} km/h** ${windSpeed > 20 ? "(Strong — risky for drones/kites)" : "(Manageable)"}\n- **Rain Probability**: **${rainChance}%**\n- **Visibility**: **${astroEnv?.visibility ?? 10} km**\n- **Temperature**: **${temp}°C** (Feels like **${feelsLike}°C**)\n\n${rainChance > 40 ? "🌧️ Carry rain protection if heading outdoors." : "☀️ Enjoy your time outside!"}`;
+  }
+
+  // 20. Thank you / Goodbye / Appreciation
+  if (/^(thanks|thank you|bye|goodbye|ok|okay|great|nice|awesome|cool|perfect|good|thik hai|shukriya|dhanyavaad)/.test(q)) {
+    return `😊 **You're welcome!** Stay safe and weather-aware in **${city}**.\n\nCurrent conditions: **${condition}** at **${temp}°C** with **${rainChance}%** rain chance. Feel free to ask me anytime about weather, outdoor planning, or travel advisories!`;
+  }
+
   // Default Smart Direct Response
-  return `Live Meteorological Intelligence for **${city}**:\n\nCurrently, it is **${condition}** at **${temp}°C** (feels like **${feelsLike}°C**). Today's diurnal range is **${maxTemp}°C High / ${minTemp}°C Low** with **${humidity}%** relative humidity, **${windSpeed} km/h** winds, and **${rainChance}%** rain probability. Air quality index is **AQI ${astroEnv?.aqi ?? 105} (${astroEnv?.aqiCategory ?? "Moderate"} - CPCB standard)**.`;
+  return `Live Meteorological Intelligence for **${city}**:\n\nCurrently, it is **${condition}** at **${temp}°C** (feels like **${feelsLike}°C**). Today's diurnal range is **${maxTemp}°C High / ${minTemp}°C Low** with **${humidity}%** relative humidity, **${windSpeed} km/h** winds, and **${rainChance}%** rain probability. Air quality index is **AQI ${astroEnv?.aqi ?? 105} (${astroEnv?.aqiCategory ?? "Moderate"} - CPCB standard)**.\n\nAsk me about 🌧️ rain, 🏃 activities, 📅 forecasts, 💨 wind, 🍃 AQI, 🌾 farming, ✈️ aviation, or 🕒 best time to go out!`;
 }
 
 export async function POST(request: Request) {
@@ -530,6 +545,8 @@ export async function POST(request: Request) {
     const now = new Date();
     const updatedAt = `${String(now.getHours() % 12 || 12).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")} ${now.getHours() >= 12 ? "PM" : "AM"}`;
 
+    console.log("[WeatherGPT] backendData?.response present:", !!backendData?.response, "length:", backendData?.response?.length ?? 0);
+    
     const narrativeResponse =
       (backendData?.response && !backendData.response.includes("Upcoming 7-Day Forecast Outlook")
         ? backendData.response
