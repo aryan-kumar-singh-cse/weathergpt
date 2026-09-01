@@ -9,6 +9,10 @@ const config: Config = {
   darkMode: 'class',
   theme: {
     extend: {
+      fontFamily: {
+        heading: ["Gotham", "Montserrat", "-apple-system", "BlinkMacSystemFont", "sans-serif"],
+        sans: ["Inter", "system-ui", "-apple-system", "BlinkMacSystemFont", "Segoe UI", "sans-serif"],
+      },
       keyframes: {
         "fade-in": {
           "0%": { opacity: "0", transform: "translateY(-10px)" },

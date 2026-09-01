@@ -45,6 +45,7 @@ const AtmosphereShader = {
 function PhotorealisticEarth({ lat, lng, weatherCondition }: Props) {
   const earthGroupRef = useRef<THREE.Group>(null);
   const cloudsRef = useRef<THREE.Mesh>(null);
+  const pulseRingRef = useRef<THREE.Mesh>(null);
 
   // Load NASA Blue Marble textures
   const [dayMap, nightMap, cloudsMap] = useTexture([
@@ -59,17 +60,51 @@ function PhotorealisticEarth({ lat, lng, weatherCondition }: Props) {
     return 0.28;
   }, [weatherCondition]);
 
-  useFrame((_, delta) => {
+  // Compute target Euler rotation angles for Google Earth-style location focus
+  const { targetRotX, targetRotY } = useMemo(() => {
+    // Convert lat/lng to sphere orientation angles aligned with camera (+Z view with horizon tilt)
+    const radLat = (lat * Math.PI) / 180;
+    const radLng = (lng * Math.PI) / 180;
+
+    // Y rotation aligns longitude facing camera
+    const rotY = -radLng - Math.PI / 2;
+    // X rotation aligns latitude with slight tilt for optimal view above lower UI cards
+    const rotX = Math.max(-0.6, Math.min(0.8, radLat * 0.65));
+
+    return { targetRotX: rotX, targetRotY: rotY };
+  }, [lat, lng]);
+
+  useFrame((state, delta) => {
     if (earthGroupRef.current) {
-      earthGroupRef.current.rotation.y += delta * 0.02;
+      // Smoothly interpolate Earth rotation to target lat/lng like Google Earth navigation
+      earthGroupRef.current.rotation.y = THREE.MathUtils.damp(
+        earthGroupRef.current.rotation.y,
+        targetRotY,
+        3.5,
+        delta
+      );
+      earthGroupRef.current.rotation.x = THREE.MathUtils.damp(
+        earthGroupRef.current.rotation.x,
+        targetRotX,
+        3.5,
+        delta
+      );
     }
+
     if (cloudsRef.current) {
-      cloudsRef.current.rotation.y += delta * 0.025;
+      cloudsRef.current.rotation.y += delta * 0.005;
+    }
+
+    // Pulsing target beacon animation
+    if (pulseRingRef.current) {
+      const elapsed = state.clock.getElapsedTime();
+      const scale = 1 + Math.sin(elapsed * 4) * 0.35;
+      pulseRingRef.current.scale.set(scale, scale, scale);
     }
   });
 
   const earthRadius = 2.45;
-  const markerPos = latLngToVector3(lat, lng, earthRadius + 0.02);
+  const markerPos = latLngToVector3(lat, lng, earthRadius + 0.025);
 
   // Positioned slightly in -Y axis ([0, -2.45, 0]) to make room for expanding forecast panel
   return (
@@ -107,15 +142,24 @@ function PhotorealisticEarth({ lat, lng, weatherCondition }: Props) {
           />
         </Sphere>
 
-        {/* Location Pin Marker with Glowing Ring */}
+        {/* Location Pin Marker with Google Earth-style Glowing Target Radar */}
         <group position={markerPos}>
+          {/* Core Pinpoint Dot */}
           <mesh>
-            <sphereGeometry args={[0.03, 16, 16]} />
-            <meshBasicMaterial color="#f59e0b" />
+            <sphereGeometry args={[0.035, 16, 16]} />
+            <meshBasicMaterial color="#facc15" />
           </mesh>
+
+          {/* Inner Golden Ring */}
           <mesh>
-            <ringGeometry args={[0.04, 0.06, 32]} />
-            <meshBasicMaterial color="#fbbf24" side={THREE.DoubleSide} transparent opacity={0.8} />
+            <ringGeometry args={[0.045, 0.07, 32]} />
+            <meshBasicMaterial color="#fbbf24" side={THREE.DoubleSide} transparent opacity={0.9} />
+          </mesh>
+
+          {/* Outer Pulsing Wave Ring */}
+          <mesh ref={pulseRingRef}>
+            <ringGeometry args={[0.08, 0.11, 32]} />
+            <meshBasicMaterial color="#38bdf8" side={THREE.DoubleSide} transparent opacity={0.6} />
           </mesh>
         </group>
       </group>

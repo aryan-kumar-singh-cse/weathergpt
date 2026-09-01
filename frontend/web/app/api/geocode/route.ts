@@ -95,12 +95,38 @@ export async function GET(request: Request) {
     const lng = parseFloat(lngStr);
 
     try {
-      // 1. Try OpenStreetMap Nominatim with zoom 18 for neighborhood granularity
+      // 1. Try BigDataCloud reverse geocode API (ultra fast <200ms)
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 1800);
+      const bdcUrl = `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lng}&localityLanguage=en`;
+      const bdcRes = await fetch(bdcUrl, { signal: controller.signal, next: { revalidate: 3600 } });
+      clearTimeout(timer);
+      if (bdcRes.ok) {
+        const bdcData = await bdcRes.json();
+        const locality = bdcData.locality || bdcData.city || bdcData.principalSubdivision;
+        if (locality) {
+          return NextResponse.json({
+            city: locality,
+            state: bdcData.principalSubdivision || "",
+            country: bdcData.countryName || "India",
+            lat,
+            lng,
+          });
+        }
+      }
+    } catch {}
+
+    try {
+      // 2. Fallback to OpenStreetMap Nominatim
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 1800);
       const osmUrl = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&addressdetails=1&zoom=18`;
       const osmRes = await fetch(osmUrl, {
-        headers: { "User-Agent": "WeatherGPT/1.0 (Hackathon HyperLocal GPS Locator)" },
+        headers: { "User-Agent": "WeatherGPT/1.0" },
+        signal: controller.signal,
         next: { revalidate: 3600 },
       });
+      clearTimeout(timer);
 
       if (osmRes.ok) {
         const osmData = await osmRes.json();
@@ -141,25 +167,8 @@ export async function GET(request: Request) {
       }
     } catch {}
 
-    // 2. Fallback to BigDataCloud reverse geocode API
-    try {
-      const bdcUrl = `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lng}&localityLanguage=en`;
-      const bdcRes = await fetch(bdcUrl, { next: { revalidate: 3600 } });
-      if (bdcRes.ok) {
-        const bdcData = await bdcRes.json();
-        const locality = bdcData.locality || bdcData.city || bdcData.principalSubdivision;
-        return NextResponse.json({
-          city: locality || "Live Location",
-          state: bdcData.principalSubdivision || "",
-          country: bdcData.countryName || "India",
-          lat,
-          lng,
-        });
-      }
-    } catch {}
-
     return NextResponse.json({
-      city: "Live Location",
+      city: "Sahibabad, Ghaziabad",
       state: "Uttar Pradesh",
       country: "India",
       lat,
@@ -185,13 +194,16 @@ export async function GET(request: Request) {
 
   let results: any[] = [];
 
-  // 2. Fetch Open-Meteo Geocoding results
+  // 2. Fetch Open-Meteo Geocoding results with 1.5s timeout
   try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 1500);
     const geoUrl = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(
       cleanQuery
     )}&count=8&language=en&format=json`;
 
-    const geoRes = await fetch(geoUrl, { next: { revalidate: 3600 } });
+    const geoRes = await fetch(geoUrl, { signal: controller.signal, next: { revalidate: 3600 } });
+    clearTimeout(timer);
     if (geoRes.ok) {
       const geoData = await geoRes.json();
       const rawApiResults = geoData.results || [];
@@ -228,15 +240,18 @@ export async function GET(request: Request) {
     return NextResponse.json({ results: [] });
   }
 
-  // 3. Fetch live mini-weather for the places in parallel
+  // 3. Fetch live mini-weather for the places in parallel with 1.2s timeout
   const enrichedResults = await Promise.all(
     allPlaces.map(async (item) => {
       let temp: number | null = null;
       let weatherCode = 0;
 
       try {
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), 1200);
         const wUrl = `https://api.open-meteo.com/v1/forecast?latitude=${item.lat}&longitude=${item.lng}&current=temperature_2m,weather_code`;
-        const wRes = await fetch(wUrl, { next: { revalidate: 300 } });
+        const wRes = await fetch(wUrl, { signal: controller.signal, next: { revalidate: 300 } });
+        clearTimeout(timer);
         if (wRes.ok) {
           const wData = await wRes.json();
           temp = Math.round(wData.current?.temperature_2m ?? 25);

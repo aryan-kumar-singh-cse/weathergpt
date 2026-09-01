@@ -440,41 +440,46 @@ export async function POST(request: Request) {
       resolvedLng = 77.3890;
     }
 
-    // Fetch 100% Dynamic Live Weather Data for these exact coordinates
-    const livePinpoint = await fetchLiveWeatherPipeline(resolvedLat, resolvedLng);
-
-    // Call backend service
-    const endpoints = [
+    // Fetch 100% Dynamic Live Weather Data and Backend AI response concurrently with fast 2.5s timeout
+    const backendEndpoints = [
       process.env.INTERNAL_API_URL || "http://backend:8000/api/v1",
       process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000/api/v1",
       "http://localhost:8000/api/v1",
     ];
 
-    let backendData: any = null;
+    const fetchBackendPromise = (async () => {
+      for (const base of backendEndpoints) {
+        try {
+          const controller = new AbortController();
+          const timer = setTimeout(() => controller.abort(), 2800);
+          const backendRes = await fetch(`${base}/ask`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            signal: controller.signal,
+            body: JSON.stringify({
+              query: message,
+              email: "user@weathergpt.local",
+              role,
+              language: (language || "en").toLowerCase().slice(0, 2),
+              location: location || undefined,
+              history: history || undefined,
+              lat: resolvedLat,
+              lng: resolvedLng,
+            }),
+          });
+          clearTimeout(timer);
+          if (backendRes.ok) {
+            return await backendRes.json();
+          }
+        } catch {}
+      }
+      return null;
+    })();
 
-    for (const base of endpoints) {
-      try {
-        const backendRes = await fetch(`${base}/ask`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            query: message,
-            email: "user@weathergpt.local",
-            role,
-            language: (language || "en").toLowerCase().slice(0, 2),
-            location: location || undefined,
-            history: history || undefined,
-            lat: resolvedLat,
-            lng: resolvedLng,
-          }),
-        });
-
-        if (backendRes.ok) {
-          backendData = await backendRes.json();
-          break;
-        }
-      } catch {}
-    }
+    const [livePinpoint, backendData] = await Promise.all([
+      fetchLiveWeatherPipeline(resolvedLat, resolvedLng),
+      fetchBackendPromise,
+    ]);
 
     const daysOfWeek = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
