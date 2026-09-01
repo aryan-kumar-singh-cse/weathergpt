@@ -10,6 +10,7 @@ type Props = {
   condition: string;
   rainChance?: number;
   lang?: SupportedLanguage;
+  onOpenMap?: () => void;
 };
 
 export default function InfoStrip({
@@ -18,6 +19,7 @@ export default function InfoStrip({
   condition,
   rainChance,
   lang = "en",
+  onOpenMap,
 }: Props) {
   const t = TRANSLATIONS[lang] || TRANSLATIONS.en;
   const translatedCondition = translateCondition(condition, lang);
@@ -56,6 +58,19 @@ export default function InfoStrip({
             <CloudRain className="w-3.5 h-3.5" />
             <span>{rainChance}% {t.rain}</span>
           </div>
+        </>
+      )}
+
+      {onOpenMap && (
+        <>
+          <span className="text-yellow-400/30 select-none">|</span>
+          <button
+            onClick={onOpenMap}
+            title="Open ISRO Satellite & Doppler Radar Overview"
+            className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-yellow-400/10 hover:bg-yellow-400/20 border border-yellow-400/40 text-xs font-bold text-yellow-300 transition cursor-pointer"
+          >
+            <span>🗺️ Map</span>
+          </button>
         </>
       )}
     </div>

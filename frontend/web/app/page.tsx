@@ -548,6 +548,7 @@ export default function Home() {
           condition={dashboardWeather.condition}
           rainChance={dashboardWeather.rainChance}
           lang={selectedLanguage}
+          onOpenMap={() => setIsSatelliteOpen(true)}
         />
       )}
 

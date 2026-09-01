@@ -1,6 +1,8 @@
-import React, { useRef, useState, useEffect, Suspense, useMemo, useCallback } from "react";
-import { Canvas, useFrame, useThree } from "@react-three/fiber";
-import { Sphere, useTexture, Html } from "@react-three/drei";
+"use client";
+
+import React, { useRef, useState, useEffect, Suspense, useMemo } from "react";
+import { Canvas, useFrame } from "@react-three/fiber";
+import { Sphere, useTexture } from "@react-three/drei";
 import * as THREE from "three";
 
 export type WeatherCondition = "clear" | "cloudy" | "rainy";
@@ -24,25 +26,7 @@ function latLngToVector3(lat: number, lng: number, radius: number) {
   );
 }
 
-// Atmospheric Glow Shader (Fresnel Rayleigh effect)
-const AtmosphereShader = {
-  vertexShader: `
-    varying vec3 vNormal;
-    void main() {
-      vNormal = normalize(normalMatrix * normal);
-      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-    }
-  `,
-  fragmentShader: `
-    varying vec3 vNormal;
-    void main() {
-      float intensity = pow(0.65 - dot(vNormal, vec3(0, 0, 1.0)), 2.5);
-      gl_FragColor = vec4(0.3, 0.6, 1.0, 1.0) * intensity;
-    }
-  `,
-};
-
-function PhotorealisticEarth({ lat, lng, weatherCondition, cityName, onSelectLocation }: Props) {
+function PhotorealisticEarth({ lat, lng, weatherCondition, onSelectLocation }: Props) {
   const earthGroupRef = useRef<THREE.Group>(null);
   const cloudsRef = useRef<THREE.Mesh>(null);
   const rippleRing1Ref = useRef<THREE.Mesh>(null);
@@ -61,10 +45,18 @@ function PhotorealisticEarth({ lat, lng, weatherCondition, cityName, onSelectLoc
     "/textures/earth-clouds.png",
   ]);
 
+  // Ensure seamless texture filtering and wrapping
+  useMemo(() => {
+    dayMap.wrapS = THREE.RepeatWrapping;
+    dayMap.wrapT = THREE.ClampToEdgeWrapping;
+    cloudsMap.wrapS = THREE.RepeatWrapping;
+    cloudsMap.wrapT = THREE.ClampToEdgeWrapping;
+  }, [dayMap, cloudsMap]);
+
   const cloudOpacity = useMemo(() => {
-    if (weatherCondition === "rainy") return 0.65;
-    if (weatherCondition === "cloudy") return 0.45;
-    return 0.28;
+    if (weatherCondition === "rainy") return 0.55;
+    if (weatherCondition === "cloudy") return 0.40;
+    return 0.22;
   }, [weatherCondition]);
 
   // Target Euler rotation angles: exactly align (lat, lng) to face camera (+Z axis)
@@ -75,7 +67,7 @@ function PhotorealisticEarth({ lat, lng, weatherCondition, cityName, onSelectLoc
     // Y rotation aligns longitude to face camera (+Z)
     const rotY = -radLng - Math.PI / 2;
     // X rotation tilts latitude to center in front of camera
-    const rotX = radLat - 0.15;
+    const rotX = radLat - 0.12;
 
     return { targetRotX: rotX, targetRotY: rotY };
   }, [lat, lng]);
@@ -83,7 +75,7 @@ function PhotorealisticEarth({ lat, lng, weatherCondition, cityName, onSelectLoc
   // Trigger Google Earth fly-to transition whenever coords change
   useEffect(() => {
     if (prevCoordsRef.current.lat !== lat || prevCoordsRef.current.lng !== lng) {
-      flyToTimeRemainingRef.current = 2.2; // 2.2s smooth fly-to transition
+      flyToTimeRemainingRef.current = 2.0; // 2s smooth fly-to transition
       prevCoordsRef.current = { lat, lng };
     }
   }, [lat, lng]);
@@ -119,24 +111,24 @@ function PhotorealisticEarth({ lat, lng, weatherCondition, cityName, onSelectLoc
     const elapsed = state.clock.getElapsedTime();
     if (rippleRing1Ref.current) {
       const phase1 = (elapsed * 2.2) % 1;
-      const scale1 = 0.8 + phase1 * 0.9;
+      const scale1 = 0.8 + phase1 * 1.0;
       rippleRing1Ref.current.scale.set(scale1, scale1, scale1);
-      (rippleRing1Ref.current.material as THREE.MeshBasicMaterial).opacity = Math.max(0, 0.85 * (1 - phase1));
+      (rippleRing1Ref.current.material as THREE.MeshBasicMaterial).opacity = Math.max(0, 0.8 * (1 - phase1));
     }
     if (rippleRing2Ref.current) {
       const phase2 = ((elapsed * 2.2) + 0.5) % 1;
-      const scale2 = 0.8 + phase2 * 0.9;
+      const scale2 = 0.8 + phase2 * 1.0;
       rippleRing2Ref.current.scale.set(scale2, scale2, scale2);
-      (rippleRing2Ref.current.material as THREE.MeshBasicMaterial).opacity = Math.max(0, 0.75 * (1 - phase2));
+      (rippleRing2Ref.current.material as THREE.MeshBasicMaterial).opacity = Math.max(0, 0.7 * (1 - phase2));
     }
   });
 
   const earthRadius = 2.05;
-  const markerPos = latLngToVector3(lat, lng, earthRadius + 0.03);
+  const markerPos = latLngToVector3(lat, lng, earthRadius + 0.02);
 
   // Laser beacon beam direction
   const beamDir = markerPos.clone().normalize();
-  const beamHeight = 0.28;
+  const beamHeight = 0.25;
   const beamCenter = markerPos.clone().add(beamDir.clone().multiplyScalar(beamHeight / 2));
   const beamQuaternion = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), beamDir);
 
@@ -164,30 +156,19 @@ function PhotorealisticEarth({ lat, lng, weatherCondition, cityName, onSelectLoc
         }
       }}
     >
-      {/* Atmosphere Outer Glow Halo */}
-      <Sphere args={[earthRadius * 1.05, 64, 64]}>
-        <shaderMaterial
-          vertexShader={AtmosphereShader.vertexShader}
-          fragmentShader={AtmosphereShader.fragmentShader}
-          blending={THREE.AdditiveBlending}
-          side={THREE.BackSide}
-          transparent
-        />
-      </Sphere>
-
       <group ref={earthGroupRef}>
         {/* Main Blue Marble Earth Surface */}
         <Sphere args={[earthRadius, 64, 64]}>
           <meshStandardMaterial
             map={dayMap}
-            roughness={0.65}
-            metalness={0.15}
+            roughness={0.7}
+            metalness={0.1}
             bumpScale={0.05}
           />
         </Sphere>
 
         {/* Atmospheric Cloud Layer */}
-        <Sphere ref={cloudsRef} args={[earthRadius + 0.015, 64, 64]}>
+        <Sphere ref={cloudsRef} args={[earthRadius + 0.012, 64, 64]}>
           <meshStandardMaterial
             map={cloudsMap}
             transparent
@@ -199,27 +180,27 @@ function PhotorealisticEarth({ lat, lng, weatherCondition, cityName, onSelectLoc
 
         {/* Vertical Holographic Atmospheric Laser Light Beam */}
         <mesh position={beamCenter} quaternion={beamQuaternion}>
-          <cylinderGeometry args={[0.006, 0.016, beamHeight, 16]} />
-          <meshBasicMaterial color="#facc15" transparent opacity={0.6} side={THREE.DoubleSide} />
+          <cylinderGeometry args={[0.005, 0.015, beamHeight, 16]} />
+          <meshBasicMaterial color="#facc15" transparent opacity={0.65} side={THREE.DoubleSide} />
         </mesh>
 
         {/* Location Pin Marker & Interactive District Map Trigger */}
         <group position={markerPos}>
           {/* Outer Concentric Holographic Radar Wave 1 */}
           <mesh ref={rippleRing1Ref}>
-            <ringGeometry args={[0.07, 0.12, 32]} />
+            <ringGeometry args={[0.06, 0.11, 32]} />
             <meshBasicMaterial color="#38bdf8" side={THREE.DoubleSide} transparent opacity={0.8} />
           </mesh>
 
           {/* Outer Concentric Holographic Radar Wave 2 */}
           <mesh ref={rippleRing2Ref}>
-            <ringGeometry args={[0.11, 0.16, 32]} />
+            <ringGeometry args={[0.10, 0.15, 32]} />
             <meshBasicMaterial color="#facc15" side={THREE.DoubleSide} transparent opacity={0.7} />
           </mesh>
 
           {/* Inner Golden Target Ring */}
           <mesh>
-            <ringGeometry args={[0.035, 0.065, 32]} />
+            <ringGeometry args={[0.03, 0.055, 32]} />
             <meshBasicMaterial color="#fbbf24" side={THREE.DoubleSide} transparent opacity={0.9} />
           </mesh>
 
@@ -236,31 +217,9 @@ function PhotorealisticEarth({ lat, lng, weatherCondition, cityName, onSelectLoc
               if (typeof document !== "undefined") document.body.style.cursor = "auto";
             }}
           >
-            <sphereGeometry args={[0.05, 24, 24]} />
-            <meshStandardMaterial color="#facc15" emissive="#f59e0b" emissiveIntensity={1.2} />
+            <sphereGeometry args={[0.045, 24, 24]} />
+            <meshStandardMaterial color="#facc15" emissive="#f59e0b" emissiveIntensity={1.4} />
           </mesh>
-
-          {/* Sleek 3D Floating District Overview Badge */}
-          <Html position={[0, 0.2, 0]} center distanceFactor={7}>
-            <div
-              onClick={(e) => {
-                e.stopPropagation();
-                onSelectLocation?.();
-              }}
-              title="Click to view full District Satellite & Radar Map"
-              className="cursor-pointer flex items-center gap-2 px-3 py-1.5 rounded-2xl bg-black/90 backdrop-blur-2xl border border-yellow-400/70 shadow-[0_0_25px_rgba(250,204,21,0.5)] text-white font-sans text-xs hover:scale-105 hover:border-yellow-300 hover:bg-black transition-all duration-200 select-none whitespace-nowrap animate-pulse"
-            >
-              <span className="w-2 h-2 rounded-full bg-yellow-400 animate-ping shrink-0" />
-              <div className="flex flex-col text-left">
-                <span className="font-bold text-yellow-300 text-[11px] leading-tight font-heading">
-                  {cityName || "Active District"}
-                </span>
-                <span className="text-[9px] text-cyan-300 font-sans tracking-wide">
-                  🗺️ Tap for District Map
-                </span>
-              </div>
-            </div>
-          </Html>
         </group>
       </group>
     </group>
@@ -269,7 +228,7 @@ function PhotorealisticEarth({ lat, lng, weatherCondition, cityName, onSelectLoc
 
 function FallbackHorizonEarth({ lat, lng }: Props) {
   const earthRadius = 2.05;
-  const markerPos = latLngToVector3(lat, lng, earthRadius + 0.03);
+  const markerPos = latLngToVector3(lat, lng, earthRadius + 0.02);
   return (
     <group position={[0, -0.1, 0]}>
       <Sphere args={[earthRadius, 32, 32]}>
@@ -304,9 +263,9 @@ export default function WeatherGlobe({
       dpr={dpr}
       gl={{ antialias: true, alpha: true }}
     >
-      <ambientLight intensity={0.55} />
-      <directionalLight position={[6, 4, 3]} intensity={2.4} color="#ffffff" />
-      <directionalLight position={[-4, 2, -2]} intensity={0.7} color="#38bdf8" />
+      <ambientLight intensity={0.65} />
+      <directionalLight position={[6, 4, 3]} intensity={2.5} color="#ffffff" />
+      <directionalLight position={[-4, 2, -2]} intensity={0.8} color="#38bdf8" />
 
       <Suspense fallback={<FallbackHorizonEarth lat={lat} lng={lng} weatherCondition={weatherCondition} />}>
         <PhotorealisticEarth
