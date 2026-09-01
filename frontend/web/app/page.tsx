@@ -313,6 +313,25 @@ export default function Home() {
 
         setChatResponse(data.response);
         setChatResponseCity(data.city);
+
+        // Dynamically rotate Earth to location mentioned in chat
+        if (data.lat && data.lng) {
+          setGlobeCoords({ lat: data.lat, lng: data.lng });
+          setDashboardWeather((prev) => ({
+            ...prev,
+            lat: data.lat,
+            lng: data.lng,
+            city: data.city || prev.city,
+            temp: data.temp ?? prev.temp,
+            feelsLike: data.feelsLike ?? prev.feelsLike,
+            condition: data.condition || prev.condition,
+            weatherType: data.weatherType || prev.weatherType,
+            rainChance: data.rainChance ?? prev.rainChance,
+            humidity: data.humidity ?? prev.humidity,
+            windSpeed: data.windSpeed ?? prev.windSpeed,
+          }));
+        }
+
         return data.response as string;
       } catch (err: any) {
         toast.error(err?.message || "Failed to process question");

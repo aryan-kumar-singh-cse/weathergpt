@@ -60,23 +60,22 @@ function PhotorealisticEarth({ lat, lng, weatherCondition }: Props) {
     return 0.28;
   }, [weatherCondition]);
 
-  // Compute target Euler rotation angles for Google Earth-style location focus
+  // Target Euler rotation angles: exactly align (lat, lng) to face camera (+Z axis)
   const { targetRotX, targetRotY } = useMemo(() => {
-    // Convert lat/lng to sphere orientation angles aligned with camera (+Z view with horizon tilt)
     const radLat = (lat * Math.PI) / 180;
     const radLng = (lng * Math.PI) / 180;
 
-    // Y rotation aligns longitude facing camera
+    // Y rotation aligns longitude to face camera (+Z)
     const rotY = -radLng - Math.PI / 2;
-    // X rotation aligns latitude with slight tilt for optimal view above lower UI cards
-    const rotX = Math.max(-0.6, Math.min(0.8, radLat * 0.65));
+    // X rotation tilts latitude to center in front of camera
+    const rotX = radLat - 0.15;
 
     return { targetRotX: rotX, targetRotY: rotY };
   }, [lat, lng]);
 
   useFrame((state, delta) => {
     if (earthGroupRef.current) {
-      // Smoothly interpolate Earth rotation to target lat/lng like Google Earth navigation
+      // Smooth Google Earth damping interpolation to entered coordinates
       earthGroupRef.current.rotation.y = THREE.MathUtils.damp(
         earthGroupRef.current.rotation.y,
         targetRotY,
@@ -92,25 +91,24 @@ function PhotorealisticEarth({ lat, lng, weatherCondition }: Props) {
     }
 
     if (cloudsRef.current) {
-      cloudsRef.current.rotation.y += delta * 0.005;
+      cloudsRef.current.rotation.y += delta * 0.006;
     }
 
     // Pulsing target beacon animation
     if (pulseRingRef.current) {
       const elapsed = state.clock.getElapsedTime();
-      const scale = 1 + Math.sin(elapsed * 4) * 0.35;
+      const scale = 1 + Math.sin(elapsed * 4.5) * 0.4;
       pulseRingRef.current.scale.set(scale, scale, scale);
     }
   });
 
-  const earthRadius = 2.45;
-  const markerPos = latLngToVector3(lat, lng, earthRadius + 0.025);
+  const earthRadius = 2.05;
+  const markerPos = latLngToVector3(lat, lng, earthRadius + 0.03);
 
-  // Positioned slightly in -Y axis ([0, -2.45, 0]) to make room for expanding forecast panel
   return (
-    <group position={[0, -2.45, 0]}>
+    <group position={[0, -0.1, 0]}>
       {/* Atmosphere Outer Glow Halo */}
-      <Sphere args={[earthRadius * 1.06, 64, 64]}>
+      <Sphere args={[earthRadius * 1.05, 64, 64]}>
         <shaderMaterial
           vertexShader={AtmosphereShader.vertexShader}
           fragmentShader={AtmosphereShader.fragmentShader}
@@ -146,20 +144,20 @@ function PhotorealisticEarth({ lat, lng, weatherCondition }: Props) {
         <group position={markerPos}>
           {/* Core Pinpoint Dot */}
           <mesh>
-            <sphereGeometry args={[0.035, 16, 16]} />
+            <sphereGeometry args={[0.045, 24, 24]} />
             <meshBasicMaterial color="#facc15" />
           </mesh>
 
           {/* Inner Golden Ring */}
           <mesh>
-            <ringGeometry args={[0.045, 0.07, 32]} />
+            <ringGeometry args={[0.055, 0.085, 32]} />
             <meshBasicMaterial color="#fbbf24" side={THREE.DoubleSide} transparent opacity={0.9} />
           </mesh>
 
           {/* Outer Pulsing Wave Ring */}
           <mesh ref={pulseRingRef}>
-            <ringGeometry args={[0.08, 0.11, 32]} />
-            <meshBasicMaterial color="#38bdf8" side={THREE.DoubleSide} transparent opacity={0.6} />
+            <ringGeometry args={[0.095, 0.135, 32]} />
+            <meshBasicMaterial color="#38bdf8" side={THREE.DoubleSide} transparent opacity={0.7} />
           </mesh>
         </group>
       </group>
@@ -168,15 +166,15 @@ function PhotorealisticEarth({ lat, lng, weatherCondition }: Props) {
 }
 
 function FallbackHorizonEarth({ lat, lng }: Props) {
-  const earthRadius = 2.45;
-  const markerPos = latLngToVector3(lat, lng, earthRadius + 0.02);
+  const earthRadius = 2.05;
+  const markerPos = latLngToVector3(lat, lng, earthRadius + 0.03);
   return (
-    <group position={[0, -2.45, 0]}>
+    <group position={[0, -0.1, 0]}>
       <Sphere args={[earthRadius, 32, 32]}>
         <meshStandardMaterial color="#0f2b48" roughness={0.7} />
       </Sphere>
       <mesh position={markerPos}>
-        <sphereGeometry args={[0.03, 16, 16]} />
+        <sphereGeometry args={[0.045, 16, 16]} />
         <meshBasicMaterial color="#f59e0b" />
       </mesh>
     </group>
@@ -194,24 +192,17 @@ export default function WeatherGlobe({ lat, lng, weatherCondition }: Props) {
 
   return (
     <Canvas
-      camera={{ position: [0, 0.45, 3.4], fov: 45 }}
+      camera={{ position: [0, 0.3, 4.5], fov: 45 }}
       dpr={dpr}
       gl={{ antialias: true, alpha: true }}
     >
-      <ambientLight intensity={0.45} />
-      <directionalLight position={[6, 4, 3]} intensity={2.2} color="#ffffff" />
-      <directionalLight position={[-4, 2, -2]} intensity={0.6} color="#38bdf8" />
+      <ambientLight intensity={0.55} />
+      <directionalLight position={[6, 4, 3]} intensity={2.4} color="#ffffff" />
+      <directionalLight position={[-4, 2, -2]} intensity={0.7} color="#38bdf8" />
 
       <Suspense fallback={<FallbackHorizonEarth lat={lat} lng={lng} weatherCondition={weatherCondition} />}>
         <PhotorealisticEarth lat={lat} lng={lng} weatherCondition={weatherCondition} />
       </Suspense>
-
-      <OrbitControls
-        enableZoom={false}
-        enablePan={false}
-        minPolarAngle={Math.PI / 3.5}
-        maxPolarAngle={Math.PI / 1.7}
-      />
     </Canvas>
   );
 }
