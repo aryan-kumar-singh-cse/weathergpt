@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import dynamic from "next/dynamic";
 import Header from "@/components/Header";
 import WeatherSummaryCard from "@/components/WeatherSummaryCard";
@@ -18,7 +18,7 @@ import DisasterReliefModal from "@/components/DisasterReliefModal";
 import RuralSmsSimulatorModal from "@/components/RuralSmsSimulatorModal";
 import { Preferences } from "@/components/SettingsPanel";
 import type { WeatherCondition } from "@/components/WeatherGlobe";
-import { SupportedLanguage, TRANSLATIONS } from "@/lib/translations";
+import { SupportedLanguage } from "@/lib/translations";
 import { reverseGeocode, get30DayOutlook } from "@/lib/api";
 import { toast, Toaster } from "react-hot-toast";
 
@@ -50,6 +50,8 @@ type DashboardWeather = {
   city: string;
   temp: number;
   feelsLike?: number;
+  maxTemp?: number;
+  minTemp?: number;
   humidity?: number;
   windSpeed?: number;
   pressure?: number;
@@ -60,37 +62,49 @@ type DashboardWeather = {
   lng: number;
   uvIndex?: number;
   aqi?: number;
+  aqiCategory?: string;
   sunrise?: string;
   sunset?: string;
   moonrise?: string;
+  moonset?: string;
   moonPhase?: string;
   visibility?: number;
   dewPoint?: number;
+  updatedAt?: string;
+  imdWarning?: string;
+  imdSeverity?: "yellow" | "orange" | "red" | "green";
   forecast?: ForecastDay[];
 };
 
 export default function Home() {
-  // Main Dashboard Weather State
+  // Main Dashboard Weather State with 0.1 Decimal Precision
   const [dashboardWeather, setDashboardWeather] = useState<DashboardWeather>({
-    city: "",
-    temp: 28,
-    feelsLike: 30,
-    humidity: 68,
-    windSpeed: 10,
+    city: "Sahibabad, Ghaziabad",
+    temp: 34.4,
+    feelsLike: 36.5,
+    maxTemp: 34.9,
+    minTemp: 26.7,
+    humidity: 41,
+    windSpeed: 2.8,
     pressure: 1012,
-    condition: "Clear Sky",
-    rainChance: 15,
-    weatherType: "clear",
+    condition: "Overcast Sky",
+    rainChance: 25,
+    weatherType: "cloudy",
     lat: 28.6780,
     lng: 77.3890,
-    uvIndex: 5.6,
-    aqi: 78,
-    sunrise: "05:58 AM",
-    sunset: "06:38 PM",
-    moonrise: "07:15 PM",
+    uvIndex: 5.4,
+    aqi: 156,
+    aqiCategory: "Moderate",
+    sunrise: "05:58",
+    sunset: "18:43",
+    moonrise: "21:00",
+    moonset: "09:49",
     moonPhase: "Waxing Gibbous",
     visibility: 10,
-    dewPoint: 21,
+    dewPoint: 21.0,
+    updatedAt: "05:30 PM",
+    imdWarning: "Thunder with Lightning and Light to Moderate Rain",
+    imdSeverity: "yellow",
     forecast: [],
   });
 
@@ -119,7 +133,7 @@ export default function Home() {
   // Vernacular Multi-Lingual State
   const [selectedLanguage, setSelectedLanguage] = useState<SupportedLanguage>("en");
 
-  // Chat-specific response state (Decoupled from Dashboard)
+  // Chat-specific response state
   const [chatResponse, setChatResponse] = useState<string | undefined>(undefined);
   const [chatResponseCity, setChatResponseCity] = useState<string | undefined>(undefined);
 
@@ -129,7 +143,7 @@ export default function Home() {
     occupation: "General Public",
   });
 
-  // 1. Fetch & Update Main Dashboard Location (via Search Bar, GPS, or Settings)
+  // 1. Fetch & Update Main Dashboard Location
   const handleSelectDashboardLocation = useCallback(
     async (cityName: string, coords?: { lat: number; lng: number }, isSilentSync = false, customLang?: SupportedLanguage) => {
       if (!cityName) return;
@@ -140,7 +154,6 @@ export default function Home() {
         setGlobeCoords({ lat: coords.lat, lng: coords.lng });
       }
 
-      // Persist active city and coordinates in localStorage
       try {
         localStorage.setItem("weathergpt_active_city", cityName);
         if (coords) {
@@ -177,24 +190,31 @@ export default function Home() {
 
         setDashboardWeather({
           city: data.city || cityName,
-          temp: data.temp ?? 28,
-          feelsLike: data.feelsLike,
-          humidity: data.humidity,
-          windSpeed: data.windSpeed,
-          pressure: data.pressure,
-          condition: data.condition || "Clear Sky",
-          rainChance: data.rainChance,
-          weatherType: data.weatherType || "clear",
+          temp: data.temp ?? 34.4,
+          feelsLike: data.feelsLike ?? 36.5,
+          maxTemp: data.maxTemp ?? 34.9,
+          minTemp: data.minTemp ?? 26.7,
+          humidity: data.humidity ?? 41,
+          windSpeed: data.windSpeed ?? 2.8,
+          pressure: data.pressure ?? 1012,
+          condition: data.condition || "Overcast Sky",
+          rainChance: data.rainChance ?? 25,
+          weatherType: data.weatherType || "cloudy",
           lat: resolvedLat,
           lng: resolvedLng,
-          uvIndex: data.uvIndex ?? 5.6,
-          aqi: data.aqi ?? 78,
-          sunrise: data.sunrise ?? "05:58 AM",
-          sunset: data.sunset ?? "06:38 PM",
-          moonrise: data.moonrise ?? "07:15 PM",
+          uvIndex: data.uvIndex ?? 5.4,
+          aqi: data.aqi ?? 156,
+          aqiCategory: data.aqiCategory ?? "Moderate",
+          sunrise: data.sunrise ?? "05:58",
+          sunset: data.sunset ?? "18:43",
+          moonrise: data.moonrise ?? "21:00",
+          moonset: data.moonset ?? "09:49",
           moonPhase: data.moonPhase ?? "Waxing Gibbous",
           visibility: data.visibility ?? 10,
-          dewPoint: data.dewPoint ?? 21,
+          dewPoint: data.dewPoint ?? 21.0,
+          updatedAt: data.updatedAt ?? "05:30 PM",
+          imdWarning: data.imdWarning ?? "Thunder with Lightning and Light to Moderate Rain",
+          imdSeverity: data.imdSeverity ?? "yellow",
           forecast: data.forecast || [],
         });
 
@@ -202,7 +222,7 @@ export default function Home() {
           setGlobeCoords({ lat: data.lat, lng: data.lng });
         }
 
-        // Fetch 15-day extended outlook for detailed window
+        // Fetch 15-day extended outlook
         try {
           const outlookRes = await get30DayOutlook(resolvedLat, resolvedLng, data.city || cityName);
           if (outlookRes?.days && outlookRes.days.length > 0) {
@@ -211,11 +231,11 @@ export default function Home() {
               return {
                 date: `${dt.getDate()} ${dt.toLocaleString("default", { month: "short" })}`,
                 day: ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][dt.getDay()],
-                condition: d.precipitation_probability > 50 ? "Rain" : "Partly Cloudy",
-                highTemp: d.temperature_max,
-                lowTemp: d.temperature_min,
+                condition: d.precipitation_probability > 40 ? "Rain" : "Partly Cloudy",
+                highTemp: parseFloat(d.temperature_max.toFixed(1)),
+                lowTemp: parseFloat(d.temperature_min.toFixed(1)),
                 rainChance: d.precipitation_probability,
-                windSpeed: d.wind_speed_max,
+                windSpeed: parseFloat(d.wind_speed_max.toFixed(1)),
               };
             });
             setDetailedDays15(mappedDetailed);
@@ -237,7 +257,7 @@ export default function Home() {
     [preferences.occupation, selectedLanguage, globeCoords.lat, globeCoords.lng]
   );
 
-  // Auto-Refresh Polling Engine (Every 2.5 minutes + 1s seconds counter)
+  // Auto-Refresh Polling Engine (Every 2.5 minutes)
   useEffect(() => {
     const counterTimer = setInterval(() => {
       setLastSyncedSecondsAgo((prev) => prev + 1);
@@ -251,7 +271,7 @@ export default function Home() {
           true
         );
       }
-    }, 150000); // 2.5 minutes
+    }, 150000);
 
     return () => {
       clearInterval(counterTimer);
@@ -259,7 +279,7 @@ export default function Home() {
     };
   }, [dashboardWeather.city, dashboardWeather.lat, dashboardWeather.lng, handleSelectDashboardLocation]);
 
-  // 2. Conversational Multi-Turn Chat Handler (Decoupled from Dashboard)
+  // 2. Multi-Turn Conversational Chat Handler
   const handleChatSend = useCallback(
     async (message: string, history?: ChatMessage[]) => {
       setIsChatLoading(true);
@@ -277,7 +297,7 @@ export default function Home() {
             message,
             occupation: preferences.occupation,
             language: selectedLanguage,
-            location: dashboardWeather.city || "Live Location",
+            location: dashboardWeather.city || "Sahibabad, Ghaziabad",
             lat: dashboardWeather.lat,
             lng: dashboardWeather.lng,
             history: formattedHistory,
@@ -298,7 +318,7 @@ export default function Home() {
     [preferences, selectedLanguage, dashboardWeather.city, dashboardWeather.lat, dashboardWeather.lng]
   );
 
-  // 3. Live GPS Geolocation Trigger (Hyper-local precision down to neighborhood / colony)
+  // 3. Live GPS Geolocation Auto-Detection Trigger
   const handleGPSDetect = useCallback((isManual = true) => {
     if (!navigator.geolocation) {
       if (isManual) toast.error("Geolocation is not supported by your browser");
@@ -316,7 +336,7 @@ export default function Home() {
         try {
           const { latitude, longitude } = pos.coords;
           const geo = await reverseGeocode(latitude, longitude);
-          const detectedCity = geo.city || "Mohan Nagar, Sahibabad";
+          const detectedCity = geo.city || "Sahibabad, Ghaziabad";
 
           setPreferences((prev) => ({ ...prev, defaultLocation: detectedCity }));
           if (toastId) toast.success(`Located at ${detectedCity}`, { id: toastId });
@@ -330,13 +350,17 @@ export default function Home() {
       },
       () => {
         setIsLocating(false);
-        if (toastId) toast.error("Location permission denied", { id: toastId });
+        if (isManual && toastId) toast.error("Location permission denied", { id: toastId });
+        // Fallback default
+        if (!isManual) {
+          handleSelectDashboardLocation("Sahibabad, Ghaziabad", { lat: 28.6780, lng: 77.3890 }, true);
+        }
       },
       { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
     );
   }, [handleSelectDashboardLocation]);
 
-  // Initial Load: Priority to User's Saved Location / GPS instead of resetting to Delhi!
+  // Initial Load: Auto-Prompt User for GPS Location (Like Native Weather Apps)
   useEffect(() => {
     let savedCity = "";
     let savedCoords: { lat: number; lng: number } | undefined;
@@ -348,11 +372,11 @@ export default function Home() {
     } catch {}
 
     if (savedCity && savedCoords) {
-      handleSelectDashboardLocation(savedCity, savedCoords);
-    } else {
-      // Auto-detect user's exact hyper-local position on first load
-      handleGPSDetect(false);
+      handleSelectDashboardLocation(savedCity, savedCoords, true);
     }
+
+    // Auto-ask GPS location immediately on initial start
+    handleGPSDetect(false);
   }, []);
 
   const handleSavePreferences = async (prefs: Preferences) => {
@@ -409,7 +433,7 @@ export default function Home() {
         />
       </div>
 
-      {/* Top Header with Clean Non-Wrapping Layout, Global Search & Vernacular Language Switcher */}
+      {/* Top Header with Global Search & Vernacular Language Switcher */}
       <Header
         preferences={preferences}
         onSavePreferences={handleSavePreferences}
@@ -456,23 +480,30 @@ export default function Home() {
         }}
       />
 
-      {/* Persistent Main Dashboard Weather Summary Card */}
+      {/* Persistent Main Dashboard Weather Summary Card (Mausam + Apple Weather Layout) */}
       <WeatherSummaryCard
         city={dashboardWeather.city}
         temp={dashboardWeather.temp}
         condition={dashboardWeather.condition}
         feelsLike={dashboardWeather.feelsLike}
+        maxTemp={dashboardWeather.maxTemp}
+        minTemp={dashboardWeather.minTemp}
         humidity={dashboardWeather.humidity}
         windSpeed={dashboardWeather.windSpeed}
         pressure={dashboardWeather.pressure}
         uvIndex={dashboardWeather.uvIndex}
         aqi={dashboardWeather.aqi}
+        aqiCategory={dashboardWeather.aqiCategory}
         sunrise={dashboardWeather.sunrise}
         sunset={dashboardWeather.sunset}
         moonrise={dashboardWeather.moonrise}
+        moonset={dashboardWeather.moonset}
         moonPhase={dashboardWeather.moonPhase}
         visibility={dashboardWeather.visibility}
         dewPoint={dashboardWeather.dewPoint}
+        updatedAt={dashboardWeather.updatedAt}
+        imdWarning={dashboardWeather.imdWarning}
+        imdSeverity={dashboardWeather.imdSeverity}
         lang={selectedLanguage}
         onRefreshGPS={() => handleGPSDetect(true)}
         isLocating={isLocating}
@@ -483,18 +514,18 @@ export default function Home() {
         onOpenSms={() => setIsSmsOpen(true)}
       />
 
-      {/* Centered Frosted-Glass Info Strip (Only when forecast panel and chat drawer are closed) */}
+      {/* Centered Frosted-Glass Info Strip */}
       {!isForecastOpen && !isChatExpanded && dashboardWeather.city && (
         <InfoStrip
           city={dashboardWeather.city}
-          temp={dashboardWeather.temp}
+          temp={Math.round(dashboardWeather.temp)}
           condition={dashboardWeather.condition}
           rainChance={dashboardWeather.rainChance}
           lang={selectedLanguage}
         />
       )}
 
-      {/* Expandable Detailed Forecast Panel with Black-to-Transparent Gradient Header */}
+      {/* Expandable Detailed Forecast Panel with 7-Day Gradient Temperature Bars */}
       <DetailedForecastPanel
         isOpen={isForecastOpen}
         onClose={() => setIsForecastOpen(false)}
@@ -503,7 +534,7 @@ export default function Home() {
         days15={detailedDays15}
       />
 
-      {/* Sector Decision Intelligence Modal (Agriculture / NDMA / Aviation / Citizen) */}
+      {/* Sector Decision Intelligence Modal */}
       <SectorAdvisoryModal
         isOpen={isAdvisoryOpen}
         onClose={() => setIsAdvisoryOpen(false)}
@@ -614,7 +645,7 @@ export default function Home() {
         lang={selectedLanguage}
       />
 
-      {/* Floating Collapsible Chat Input Bar (Decoupled from Dashboard with Multi-Turn Memory) */}
+      {/* Floating Collapsible Chat Input Bar */}
       <div className="absolute bottom-6 md:bottom-8 left-1/2 -translate-x-1/2 z-30 w-[94%] max-w-2xl">
         <ChatInputBar
           onSend={handleChatSend}

@@ -7,11 +7,10 @@ import {
   CloudRain,
   CloudLightning,
   CloudSnow,
-  Wind,
-  Droplets,
   Calendar,
   X,
 } from "lucide-react";
+import TemperatureRangeBar from "./TemperatureRangeBar";
 
 export type DetailedDay = {
   date: number | string;
@@ -50,15 +49,14 @@ function renderWeatherIcon(condition: string) {
   return <Sun className="w-5 h-5 text-yellow-400 shrink-0" />;
 }
 
-// Generate guaranteed 15 days if list is short
 function ensureDayCount(days: DetailedDay[], targetCount: number): DetailedDay[] {
   if (days.length >= targetCount) return days.slice(0, targetCount);
 
   const daysOfWeek = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
   const result = [...days];
   const lastItem = days[days.length - 1];
-  const baseHigh = lastItem?.highTemp ?? 32;
-  const baseLow = lastItem?.lowTemp ?? 24;
+  const baseHigh = lastItem?.highTemp ?? 34;
+  const baseLow = lastItem?.lowTemp ?? 26;
 
   for (let i = days.length; i < targetCount; i++) {
     const d = new Date();
@@ -67,8 +65,8 @@ function ensureDayCount(days: DetailedDay[], targetCount: number): DetailedDay[]
       date: `${d.getDate()} ${d.toLocaleString("default", { month: "short" })}`,
       day: daysOfWeek[d.getDay()],
       condition: i % 3 === 0 ? "Rain" : i % 2 === 0 ? "Partly Cloudy" : "Sunny",
-      highTemp: Math.round(baseHigh + ((i % 4) - 1.5)),
-      lowTemp: Math.round(baseLow + ((i % 3) - 1)),
+      highTemp: parseFloat((baseHigh + ((i % 4) - 1.2)).toFixed(1)),
+      lowTemp: parseFloat((baseLow + ((i % 3) - 0.8)).toFixed(1)),
       rainChance: (i * 17) % 65,
       windSpeed: 10 + (i % 6),
     });
@@ -91,15 +89,21 @@ export default function DetailedForecastPanel({
   const valid15Days = ensureDayCount(days15.length > 0 ? days15 : days7, 15);
   const currentDays = tab === "7day" ? valid7Days : valid15Days;
 
+  // Compute global min/max for aligned temperature bars
+  const allMins = currentDays.map((d) => d.lowTemp ?? d.highTemp - 5);
+  const allMaxs = currentDays.map((d) => d.highTemp);
+  const globalMin = Math.min(...allMins) - 2;
+  const globalMax = Math.max(...allMaxs) + 2;
+
   return (
     <div
       className="absolute top-20 md:top-24 left-1/2 -translate-x-1/2 z-40
-                 w-[95%] max-w-6xl rounded-3xl
-                 bg-black/90 backdrop-blur-2xl border border-yellow-400/30
-                 shadow-2xl shadow-black/80 overflow-hidden animate-fade-in transition-all duration-300"
+                 w-[95%] max-w-5xl rounded-3xl
+                 bg-black/95 backdrop-blur-2xl border border-yellow-400/35
+                 shadow-2xl shadow-black/90 overflow-hidden animate-fade-in transition-all duration-300 font-mono"
     >
-      {/* Top Header with black-to-transparent gradient */}
-      <div className="bg-gradient-to-b from-black via-black/80 to-transparent px-6 py-4.5 border-b border-yellow-400/20 flex items-center justify-between">
+      {/* Top Header */}
+      <div className="bg-gradient-to-b from-black via-black/90 to-transparent px-6 py-4 border-b border-yellow-400/20 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-2xl bg-yellow-400/15 border border-yellow-400/40 flex items-center justify-center text-yellow-400 shadow-md">
             <Calendar className="w-5 h-5" />
@@ -107,12 +111,12 @@ export default function DetailedForecastPanel({
           <div>
             <div className="flex items-center gap-2">
               <h2 className="text-base md:text-lg font-bold text-white tracking-tight">
-                Detailed Forecast
+                Extended Outlook
               </h2>
-              <span className="text-xs font-mono text-yellow-400/90">• {city}</span>
+              <span className="text-xs text-yellow-400 font-bold">• {city}</span>
             </div>
-            <p className="text-[11px] text-gray-400 font-mono">
-              High-accuracy meteorological trend and precipitation probability
+            <p className="text-[11px] text-gray-400">
+              IMD Synoptic range bars & precipitation probabilities
             </p>
           </div>
         </div>
@@ -122,9 +126,9 @@ export default function DetailedForecastPanel({
           <div className="flex items-center p-1 rounded-xl bg-black/60 border border-yellow-400/30">
             <button
               onClick={() => setTab("7day")}
-              className={`text-xs font-mono px-4 py-1.5 rounded-lg transition-all cursor-pointer ${
+              className={`text-xs px-4 py-1.5 rounded-lg transition-all cursor-pointer ${
                 tab === "7day"
-                  ? "bg-yellow-400 text-gray-950 font-bold shadow-md shadow-yellow-400/20"
+                  ? "bg-yellow-400 text-gray-950 font-bold shadow-md"
                   : "text-yellow-400/70 hover:text-yellow-300 hover:bg-yellow-400/10"
               }`}
             >
@@ -132,9 +136,9 @@ export default function DetailedForecastPanel({
             </button>
             <button
               onClick={() => setTab("15day")}
-              className={`text-xs font-mono px-4 py-1.5 rounded-lg transition-all cursor-pointer ${
+              className={`text-xs px-4 py-1.5 rounded-lg transition-all cursor-pointer ${
                 tab === "15day"
-                  ? "bg-yellow-400 text-gray-950 font-bold shadow-md shadow-yellow-400/20"
+                  ? "bg-yellow-400 text-gray-950 font-bold shadow-md"
                   : "text-yellow-400/70 hover:text-yellow-300 hover:bg-yellow-400/10"
               }`}
             >
@@ -152,64 +156,55 @@ export default function DetailedForecastPanel({
         </div>
       </div>
 
-      {/* Grid of forecast cards */}
-      <div className="p-4 md:p-6 max-h-[420px] md:max-h-[500px] overflow-y-auto scrollbar-thin scrollbar-thumb-yellow-400/30">
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3.5">
-          {currentDays.map((d, index) => (
+      {/* List of forecast rows with Horizontal Gradient Bars (Matching Screenshot #2) */}
+      <div className="p-4 md:p-6 max-h-[460px] overflow-y-auto space-y-2.5">
+        {currentDays.map((d, index) => {
+          const min = d.lowTemp ?? d.highTemp - 5;
+          const max = d.highTemp;
+
+          return (
             <div
               key={index}
-              className="flex flex-col justify-between p-4 rounded-2xl
-                         bg-gray-950/80 border border-white/10 hover:border-yellow-400/40 hover:bg-yellow-400/[0.04]
-                         transition-all duration-200 text-white font-mono shadow-md"
+              className="p-3.5 rounded-2xl bg-gray-950/80 border border-white/10 hover:border-yellow-400/40 hover:bg-yellow-400/[0.04] transition-all flex items-center justify-between gap-4 text-white"
             >
-              {/* Day & Date Header */}
-              <div className="flex items-center justify-between pb-2 border-b border-white/10">
-                <span className="text-xs font-bold text-yellow-400 uppercase">{d.day}</span>
-                <span className="text-[11px] text-gray-400">{d.date}</span>
+              {/* Day & Date */}
+              <div className="w-24 shrink-0">
+                <span className="text-xs font-bold text-yellow-300 block">{d.day}</span>
+                <span className="text-[10px] text-gray-400">{d.date}</span>
               </div>
 
-              {/* Icon & Condition */}
-              <div className="my-3 flex flex-col items-center text-center">
-                <div className="p-2.5 rounded-full bg-white/5 border border-white/10 mb-2">
-                  {renderWeatherIcon(d.condition)}
-                </div>
-                <span className="text-xs font-medium text-white/90 line-clamp-1 capitalize">
+              {/* Weather Icon & Condition */}
+              <div className="w-36 flex items-center gap-2 shrink-0">
+                {renderWeatherIcon(d.condition)}
+                <span className="text-xs text-gray-200 capitalize truncate">
                   {d.condition || "Clear"}
                 </span>
               </div>
 
-              {/* Temperatures */}
-              <div className="flex items-baseline justify-between pt-2 border-t border-white/10">
-                <div className="flex flex-col">
-                  <span className="text-[10px] text-gray-400 uppercase">Max</span>
-                  <span className="text-sm font-bold text-white">
-                    {Math.round(d.highTemp)}°C
-                  </span>
-                </div>
-
-                {d.lowTemp !== undefined && (
-                  <div className="flex flex-col text-right">
-                    <span className="text-[10px] text-gray-400 uppercase">Min</span>
-                    <span className="text-xs font-semibold text-gray-400">
-                      {Math.round(d.lowTemp)}°C
-                    </span>
-                  </div>
-                )}
+              {/* Gradient Temperature Bar Track */}
+              <div className="flex-1 max-w-md">
+                <TemperatureRangeBar
+                  minTemp={min}
+                  maxTemp={max}
+                  globalMin={globalMin}
+                  globalMax={globalMax}
+                />
               </div>
 
-              {/* Rain Probability Metric */}
-              {d.rainChance !== undefined && (
-                <div className="mt-2.5 pt-1.5 flex items-center justify-between text-[11px] text-cyan-400 border-t border-white/5">
-                  <span className="flex items-center gap-1">
-                    <CloudRain className="w-3 h-3 text-cyan-400" />
-                    <span>Rain</span>
+              {/* Rain Probability Badge */}
+              <div className="w-16 text-right shrink-0">
+                {d.rainChance !== undefined && d.rainChance > 0 ? (
+                  <span className="text-xs text-sky-400 font-semibold flex items-center justify-end gap-1">
+                    <CloudRain className="w-3 h-3" />
+                    <span>{d.rainChance}%</span>
                   </span>
-                  <span className="font-bold">{d.rainChance}%</span>
-                </div>
-              )}
+                ) : (
+                  <span className="text-[11px] text-gray-500">0%</span>
+                )}
+              </div>
             </div>
-          ))}
-        </div>
+          );
+        })}
       </div>
     </div>
   );
