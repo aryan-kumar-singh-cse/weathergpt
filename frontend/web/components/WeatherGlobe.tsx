@@ -107,34 +107,34 @@ function PhotorealisticEarth({ lat, lng, weatherCondition, onSelectLocation }: P
       cloudsRef.current.rotation.y += delta * 0.018;
     }
 
-    // Concentric Radar Ripple Wave Animations
+    // Concentric Radar Ripple Wave Animations (tangent on surface)
     const elapsed = state.clock.getElapsedTime();
     if (rippleRing1Ref.current) {
-      const phase1 = (elapsed * 2.2) % 1;
-      const scale1 = 0.8 + phase1 * 1.0;
+      const phase1 = (elapsed * 2.0) % 1;
+      const scale1 = 0.6 + phase1 * 0.8;
       rippleRing1Ref.current.scale.set(scale1, scale1, scale1);
-      (rippleRing1Ref.current.material as THREE.MeshBasicMaterial).opacity = Math.max(0, 0.8 * (1 - phase1));
+      (rippleRing1Ref.current.material as THREE.MeshBasicMaterial).opacity = Math.max(0, 0.85 * (1 - phase1));
     }
     if (rippleRing2Ref.current) {
-      const phase2 = ((elapsed * 2.2) + 0.5) % 1;
-      const scale2 = 0.8 + phase2 * 1.0;
+      const phase2 = ((elapsed * 2.0) + 0.5) % 1;
+      const scale2 = 0.6 + phase2 * 0.8;
       rippleRing2Ref.current.scale.set(scale2, scale2, scale2);
-      (rippleRing2Ref.current.material as THREE.MeshBasicMaterial).opacity = Math.max(0, 0.7 * (1 - phase2));
+      (rippleRing2Ref.current.material as THREE.MeshBasicMaterial).opacity = Math.max(0, 0.75 * (1 - phase2));
     }
   });
 
   const earthRadius = 2.05;
-  const markerPos = latLngToVector3(lat, lng, earthRadius + 0.02);
+  const markerPos = latLngToVector3(lat, lng, earthRadius + 0.005);
 
-  // Laser beacon beam direction
-  const beamDir = markerPos.clone().normalize();
-  const beamHeight = 0.25;
-  const beamCenter = markerPos.clone().add(beamDir.clone().multiplyScalar(beamHeight / 2));
-  const beamQuaternion = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), beamDir);
+  // Calculate surface normal quaternion so pin & rings lie perfectly tangent to the curved Earth
+  const markerNormal = markerPos.clone().normalize();
+  const markerQuaternion = useMemo(() => {
+    return new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), markerNormal);
+  }, [markerNormal]);
 
   return (
     <group
-      position={[0, -0.1, 0]}
+      position={[0, 0, 0]}
       onPointerDown={(e) => {
         isDraggingRef.current = true;
         prevPointerRef.current = { x: e.clientX, y: e.clientY };
@@ -161,8 +161,8 @@ function PhotorealisticEarth({ lat, lng, weatherCondition, onSelectLocation }: P
         <Sphere args={[earthRadius, 64, 64]}>
           <meshStandardMaterial
             map={dayMap}
-            roughness={0.7}
-            metalness={0.1}
+            roughness={0.75}
+            metalness={0.08}
             bumpScale={0.05}
           />
         </Sphere>
@@ -178,34 +178,35 @@ function PhotorealisticEarth({ lat, lng, weatherCondition, onSelectLocation }: P
           />
         </Sphere>
 
-        {/* Vertical Holographic Atmospheric Laser Light Beam */}
-        <mesh position={beamCenter} quaternion={beamQuaternion}>
-          <cylinderGeometry args={[0.005, 0.015, beamHeight, 16]} />
-          <meshBasicMaterial color="#facc15" transparent opacity={0.65} side={THREE.DoubleSide} />
-        </mesh>
-
-        {/* Location Pin Marker & Interactive District Map Trigger */}
-        <group position={markerPos}>
-          {/* Outer Concentric Holographic Radar Wave 1 */}
-          <mesh ref={rippleRing1Ref}>
-            <ringGeometry args={[0.06, 0.11, 32]} />
+        {/* Perfectly Tangent & Upright Google Earth 3D Pin Marker */}
+        <group position={markerPos} quaternion={markerQuaternion}>
+          {/* Surface Concentric Radar Ripple 1 (lying flat on sphere surface) */}
+          <mesh ref={rippleRing1Ref} rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.005, 0]}>
+            <ringGeometry args={[0.04, 0.08, 32]} />
             <meshBasicMaterial color="#38bdf8" side={THREE.DoubleSide} transparent opacity={0.8} />
           </mesh>
 
-          {/* Outer Concentric Holographic Radar Wave 2 */}
-          <mesh ref={rippleRing2Ref}>
-            <ringGeometry args={[0.10, 0.15, 32]} />
+          {/* Surface Concentric Radar Ripple 2 (lying flat on sphere surface) */}
+          <mesh ref={rippleRing2Ref} rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.005, 0]}>
+            <ringGeometry args={[0.07, 0.12, 32]} />
             <meshBasicMaterial color="#facc15" side={THREE.DoubleSide} transparent opacity={0.7} />
           </mesh>
 
-          {/* Inner Golden Target Ring */}
-          <mesh>
-            <ringGeometry args={[0.03, 0.055, 32]} />
+          {/* Surface Ground Target Disc (flush on ground) */}
+          <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.006, 0]}>
+            <circleGeometry args={[0.032, 32]} />
             <meshBasicMaterial color="#fbbf24" side={THREE.DoubleSide} transparent opacity={0.9} />
           </mesh>
 
-          {/* Core Glowing Pinpoint Sphere */}
+          {/* Sleek Vertical Tapered Pin Needle */}
+          <mesh position={[0, 0.07, 0]}>
+            <cylinderGeometry args={[0.004, 0.009, 0.14, 16]} />
+            <meshStandardMaterial color="#fbbf24" roughness={0.3} metalness={0.8} />
+          </mesh>
+
+          {/* Glowing Golden Pinhead Sphere (Clickable) */}
           <mesh
+            position={[0, 0.15, 0]}
             onClick={(e) => {
               e.stopPropagation();
               onSelectLocation?.();
@@ -217,8 +218,8 @@ function PhotorealisticEarth({ lat, lng, weatherCondition, onSelectLocation }: P
               if (typeof document !== "undefined") document.body.style.cursor = "auto";
             }}
           >
-            <sphereGeometry args={[0.045, 24, 24]} />
-            <meshStandardMaterial color="#facc15" emissive="#f59e0b" emissiveIntensity={1.4} />
+            <sphereGeometry args={[0.038, 24, 24]} />
+            <meshStandardMaterial color="#facc15" emissive="#f59e0b" emissiveIntensity={1.2} />
           </mesh>
         </group>
       </group>
@@ -228,14 +229,14 @@ function PhotorealisticEarth({ lat, lng, weatherCondition, onSelectLocation }: P
 
 function FallbackHorizonEarth({ lat, lng }: Props) {
   const earthRadius = 2.05;
-  const markerPos = latLngToVector3(lat, lng, earthRadius + 0.02);
+  const markerPos = latLngToVector3(lat, lng, earthRadius + 0.01);
   return (
-    <group position={[0, -0.1, 0]}>
+    <group position={[0, 0, 0]}>
       <Sphere args={[earthRadius, 32, 32]}>
         <meshStandardMaterial color="#0f2b48" roughness={0.7} />
       </Sphere>
       <mesh position={markerPos}>
-        <sphereGeometry args={[0.045, 16, 16]} />
+        <sphereGeometry args={[0.035, 16, 16]} />
         <meshBasicMaterial color="#f59e0b" />
       </mesh>
     </group>
@@ -250,16 +251,23 @@ export default function WeatherGlobe({
   onSelectLocation,
 }: Props) {
   const [dpr, setDpr] = useState<[number, number]>([1, 2]);
+  const [isDesktop, setIsDesktop] = useState(true);
 
   useEffect(() => {
-    if (typeof window !== "undefined" && window.innerWidth < 768) {
-      setDpr([1, 1]);
+    if (typeof window !== "undefined") {
+      setIsDesktop(window.innerWidth >= 1024);
+      if (window.innerWidth < 768) {
+        setDpr([1, 1]);
+      }
     }
   }, []);
 
+  // Frame the Earth nicely: on desktop offset slightly right [0.5, 0.1, 4.4] so left dashboard card doesn't occlude it
+  const cameraPos: [number, number, number] = isDesktop ? [0.45, 0.1, 4.5] : [0, 0.2, 4.5];
+
   return (
     <Canvas
-      camera={{ position: [0, 0.3, 4.5], fov: 45 }}
+      camera={{ position: cameraPos, fov: 44 }}
       dpr={dpr}
       gl={{ antialias: true, alpha: true }}
     >
