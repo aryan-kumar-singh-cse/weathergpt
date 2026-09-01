@@ -361,9 +361,21 @@ function generateIntelligentConversationalResponse(
     return `🟢 **No severe weather warnings active for ${city}.**\n\nCurrent atmospheric state is normal under **${condition}** with temperature **${temp}°C** and light winds.`;
   }
 
-  // 16. Greetings & General Identity
-  if (/^(hi|hello|hey|namaste|good morning|good evening|who are you|help|what can you do)/.test(q)) {
-    return `👋 **Namaste! I am WeatherGPT**, your real-time sovereign meteorological intelligence assistant.\n\nCurrently in **${city}**, the weather is **${condition}** at **${temp}°C** (feels like **${feelsLike}°C**) with **${humidity}%** humidity and **${rainChance}%** rain chance.\n\nYou can ask me anything about:\n- 🌧️ Rain & Umbrella advice\n- 🏃 Outdoor activities, running & sports\n- 📅 Tomorrow and 7-day forecasts\n- 💨 Wind, humidity & heat index\n- 🍃 Air Quality (AQI) & UV index\n- 🌾 Agricultural crop & spraying advisories`;
+  // 17. Suitable Time to Go Out / Best Time to Step Outside
+  if (/time to go out|when to go out|best time|suitable time|good time|when should i leave|safe to go out/.test(q)) {
+    let bestSlot = "early morning (06:00 AM - 08:30 AM) or evening after 06:30 PM";
+    if (nowcastSlots && nowcastSlots.length > 0) {
+      const coolestSlot = [...nowcastSlots].sort((a: any, b: any) => a.temp - b.temp)[0];
+      if (coolestSlot) {
+        bestSlot = `around **${coolestSlot.time}** when temperature moderates to **${coolestSlot.temp}°C**`;
+      }
+    }
+    return `🕒 **Best & Most Suitable Time to Go Out in ${city}**:\n\n- **Recommended Window**: ${bestSlot}\n- **Current Situation**: Right now it is **${condition}** at **${temp}°C** (feels like **${feelsLike}°C**) with **${humidity}% humidity** and a **${rainChance}% rain chance**.\n- **Air Quality & UV**: AQI is **${astroEnv?.aqi ?? 105} (${astroEnv?.aqiCategory ?? "Moderate"})**, UV Index is **${astroEnv?.uvIndex ?? 5.4}**.\n\n💡 **Tip**: If heading out during afternoon hours, carry an umbrella and drink plenty of fluids.`;
+  }
+
+  // 18. "More" / "Tell me more" / "Detailed breakdown"
+  if (/^(more|tell me more|details|detailed|expand|what else|more info|explain more|deep dive)/.test(q)) {
+    return `📊 **Comprehensive Meteorological Deep-Dive for ${city}**:\n\n- **Atmospheric Thermodynamics**: Ambient **${temp}°C**, Apparent Heat Index **${feelsLike}°C**, Dew Point **${astroEnv?.dewPoint ?? 21.0}°C**.\n- **Precipitation Envelope**: 24-hr probability is **${rainChance}%** with atmospheric pressure at **${pressure} hPa**.\n- **Air Quality & Dispersion**: CPCB NAQI **${astroEnv?.aqi ?? 105} (${astroEnv?.aqiCategory ?? "Moderate"})** under surface ventilation of **${windSpeed} km/h**.\n- **Horizon Ephemeris**: Sunrise at **${astroEnv?.sunrise ?? "05:58"} IST**, Sunset at **${astroEnv?.sunset ?? "18:43"} IST**, Moon Phase **${astroEnv?.moonPhase ?? "Waxing Crescent"}**.\n\nAsk me about tomorrow's outlook, agricultural spraying suitability, or aviation runway crosswinds!`;
   }
 
   // Default Smart Direct Response
