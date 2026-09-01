@@ -36,7 +36,7 @@ export type ChatMessage = {
 };
 
 type Props = {
-  onSend: (message: string, history?: ChatMessage[]) => void;
+  onSend: (message: string, history?: ChatMessage[]) => Promise<string | undefined> | any;
   isLoading?: boolean;
   latestResponse?: string;
   latestResponseCity?: string;
@@ -177,7 +177,7 @@ export default function ChatInputBar({
     setTimeout(() => setCopiedMessageId(null), 2000);
   };
 
-  const handleSubmit = (textToSend?: string) => {
+  const handleSubmit = async (textToSend?: string) => {
     const query = (textToSend || value).trim();
     if (!query || isLoading) return;
 
@@ -191,8 +191,30 @@ export default function ChatInputBar({
     const newMessages = [...messages, userMsg];
     setMessages(newMessages);
     setExpanded(true);
-    onSend(query, newMessages);
     setValue("");
+
+    try {
+      const responseText = await onSend(query, newMessages);
+      if (responseText) {
+        setMessages((prev) => {
+          const last = prev[prev.length - 1];
+          if (last && last.sender === "assistant" && last.text === responseText) {
+            return prev;
+          }
+          return [
+            ...prev,
+            {
+              id: crypto.randomUUID(),
+              sender: "assistant",
+              text: responseText,
+              timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+              role,
+              city: latestResponseCity || currentDashboardCity,
+            },
+          ];
+        });
+      }
+    } catch {}
   };
 
   const handleClearChat = (e: React.MouseEvent) => {

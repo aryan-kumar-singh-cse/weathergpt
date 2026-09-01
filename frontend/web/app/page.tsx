@@ -313,8 +313,10 @@ export default function Home() {
 
         setChatResponse(data.response);
         setChatResponseCity(data.city);
+        return data.response as string;
       } catch (err: any) {
         toast.error(err?.message || "Failed to process question");
+        return undefined;
       } finally {
         setIsChatLoading(false);
       }
