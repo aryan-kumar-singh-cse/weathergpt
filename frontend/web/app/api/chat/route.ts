@@ -445,13 +445,13 @@ CORE INSTRUCTIONS:
 
   messages.push({ role: "user", content: userQuery });
 
-  // 1. Primary: Groq High-Speed Llama Models (Llama 3.3 70B & Llama 3.1 8B Instant)
+  // 1. Primary: Groq High-Speed Models (openai/gpt-oss-120b, openai/gpt-oss-20b, qwen/qwen3.6-27b)
   if (groqKey && !groqKey.startsWith("your-")) {
-    const groqModels = ["llama-3.3-70b-versatile", "llama-3.1-8b-instant", "llama3-70b-8192"];
+    const groqModels = ["openai/gpt-oss-120b", "openai/gpt-oss-20b", "qwen/qwen3.6-27b", "qwen/qwen3.8-27b", "groq/compound"];
     for (const model of groqModels) {
       try {
         const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 4000);
+        const timeout = setTimeout(() => controller.abort(), 4500);
         const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
           method: "POST",
           headers: {
@@ -481,13 +481,13 @@ CORE INSTRUCTIONS:
     }
   }
 
-  // 2. Secondary: Google Gemini Models (Gemini 2.0 Flash & Gemini 1.5 Flash)
+  // 2. Secondary: Google Gemini Models (Gemini 3.6 Flash & Gemini 2.5 Flash)
   if (geminiKey && !geminiKey.startsWith("your-")) {
-    const geminiModels = ["gemini-2.0-flash", "gemini-1.5-flash"];
+    const geminiModels = ["gemini-3.6-flash", "gemini-2.5-flash", "gemini-flash-latest"];
     for (const model of geminiModels) {
       try {
         const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 4000);
+        const timeout = setTimeout(() => controller.abort(), 4500);
         const res = await fetch("https://generativelanguage.googleapis.com/v1beta/openai/chat/completions", {
           method: "POST",
           headers: {

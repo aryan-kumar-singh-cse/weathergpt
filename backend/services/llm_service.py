@@ -80,7 +80,7 @@ class LLMService:
 
         # Try Tier A (Primary - Groq)
         if primary_key and not primary_key.startswith("your-"):
-            groq_models = [self.primary_model, "llama-3.1-70b-versatile", "llama-3.1-8b-instant", "llama3-70b-8192", "llama3-8b-8192", "mixtral-8x7b-32768", "gemma2-9b-it"]
+            groq_models = ["openai/gpt-oss-120b", "openai/gpt-oss-20b", "qwen/qwen3.6-27b", "qwen/qwen3.8-27b", "groq/compound", self.primary_model]
             primary_client = AsyncOpenAI(
                 base_url=self.primary_base_url,
                 api_key=primary_key
