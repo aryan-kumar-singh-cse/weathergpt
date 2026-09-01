@@ -1,0 +1,164 @@
+========================================================================================
+                          WEATHERGPT — SIH 2026 OFFICIAL PROJECT DOSSIER
+             Next-Gen AI-Powered Agro-Meteorological Intelligence & Early Warning Hub
+========================================================================================
+
+PROJECT NAME: WeatherGPT
+HACKATHON: Smart India Hackathon (SIH) 2026
+REPOSITORY: https://github.com/aryan-kumar-singh-cse/weathergpt
+TARGET BRANCH: dev
+DEPLOYMENT: Fully Dockerized (Next.js 14 Frontend + FastAPI Backend)
+
+----------------------------------------------------------------------------------------
+1. PROBLEM STATEMENT & THE "WHY"
+----------------------------------------------------------------------------------------
+Standard weather applications and websites provide raw numbers (such as 32°C, 82% humidity,
+12 km/h wind) which are confusing and non-actionable for ordinary citizens, farmers, pilots,
+and disaster response authorities. Furthermore:
+1. Rural farmers cannot interpret meteorological parameters to make critical spraying,
+   irrigation, or sowing decisions.
+2. In disaster scenarios (cloudbursts, lightning strikes, localized flash floods), real-time
+   plain-language early warnings in regional Indian languages are almost non-existent.
+3. Offline/feature-phone users with 2G/3G connectivity are completely excluded from modern
+   visual weather platforms.
+4. Conventional chatbots overwrite the user's dashboard location or hallucinate outdated
+   information without real satellite/synoptic ground truth.
+
+WeatherGPT solves this by transforming multi-source spaceborne and terrestrial atmospheric
+telemetry into actionable, vernacular, role-tailored decision intelligence.
+
+----------------------------------------------------------------------------------------
+2. COMPLETE FEATURE BREAKDOWN & TECHNICAL IMPLEMENTATION
+----------------------------------------------------------------------------------------
+
+[FEATURE 1: 3D WebGL Planetary Earth Globe]
+- Implementation: Three.js WebGL canvas rendering a 3D Earth sphere with custom atmospheric
+  scattering shaders, realistic lighting vectors, and rotating cloud layers.
+- Real-Time Precipitation Engine: Dynamic particle system simulating rain, cloud cover, and
+  clear sky lighting synced to the user's active geographic coordinates.
+- UI Ergonomics: Dockable and minimizable summary card ensuring zero obstruction of the 3D
+  planet.
+
+[FEATURE 2: Dual-Tier LLM Intelligence Pipeline with Multi-Turn Memory]
+- Tier 1 (Primary): Groq Cloud executing LLaMA 3.3 70B Versatile, delivering complete
+  meteorological reasoning in <500ms.
+- Tier 2 (Fallback): Google Gemini 1.5/2.5 Flash providing automatic failover if Groq hits
+  rate-limits or network timeout.
+- Decoupled Architecture: Asking about "Weather in Mumbai" in the chat drawer answers the
+  question in the conversation history without disturbing or overriding the main dashboard's
+  active location (e.g. Ghaziabad).
+- Role Personas: Dynamic system prompting tailored for Farmers (Gramin Krishi Mausam Seva),
+  Pilots (METAR/TAF/VFR/Turbulence), Disaster Teams (NDMA protocols), and Public Health.
+
+[FEATURE 3: Full-Stack Vernacular Multi-Lingual Architecture (7 Indian Languages)]
+- Supported Languages: English, हिन्दी (Hindi), मराठी (Marathi), தமிழ் (Tamil),
+  తెలుగు (Telugu), বাংলা (Bengali), and ગુજરાતી (Gujarati).
+- Total System Localization: When a user selects a language:
+  a. UI headers, buttons, cards, and tooltips switch to native regional script.
+  b. Active weather reports and metrics re-fetch in that regional language.
+  c. LLM chat answers are generated directly in the vernacular script.
+  d. Text-To-Speech (TTS) voice synthesizer reads bulletins in native regional dialect.
+
+[FEATURE 4: DAMINI / IITM Real-Time Lightning & Convective Instability Risk Analyzer]
+- Genuine Meteorological Convective Analysis: Analyzes thermal energy, dew-point depression,
+  rain probability, and storm codes to compute real convective instability.
+- Plain-Language Classification:
+  * 🟢 SAFE: Stable atmosphere. Zero convective storm cells within 30km radius.
+  * 🟡 CAUTION: Convective cloud buildup in progress. Watch for sudden thunder/rain.
+  * 🔴 DANGER: Active lightning discharge. Immediate indoor shelter advisory.
+- Ground Sensor Metrics: Displays nearest strike distance (km), 30-minute discharge counts,
+  and convective cell movement vectors.
+- NDMA 30-30 Safety Directive: Actionable safety guidelines for rural field workers.
+
+[FEATURE 5: ISRO INSAT-3DR Geostationary Satellite & Synoptic Radar Visualizer]
+- Spaceborne Satellite Imagery: Embedded geostationary sector feeds (74°E orbital position).
+- Multi-Channel Synoptic Layers:
+  * Thermal Infrared (TIR1): Cloud-top temperature and cyclone vortex tracking.
+  * Precipitation Radar: Live Doppler reflectivity streams for active rain cells.
+  * Wind Streamlines: Dynamic wind circulation and monsoon pressure vectors.
+- Plain-Language Telemetry Analysis: Translates complex satellite scans into simple sentences
+  explaining exactly what the satellite sees over the user's district.
+
+[FEATURE 6: Krishi Vigyan Kendra (KVK) Smart Crop Phenology & GDD Engine]
+- Growing Degree Days (GDD) Calculation: Thermal accumulation formula based on daily max/min
+  temperatures and base thresholds.
+- Indian Crop Catalog: Paddy (Rice), Cotton, Wheat, Mustard, Sugarcane, Soybean.
+- Days After Sowing (DAS) Slider: Tracks stages from Tillering, Panicle Initiation, Flowering,
+  to Maturity.
+- Pest & Disease Early Warning: Identifies weather triggers for Blast, False Smut, Pink
+  Bollworm, and Yellow Rust with recommended bio-pesticide and chemical dosages.
+
+[FEATURE 7: NDMA Multi-Hazard Disaster & Relief Camp Directory]
+- Rainfall Inundation Simulator: Interactive slider (10mm to 200mm) modeling flood runoff,
+  drainage overload, and waterlogging envelopes.
+- 1-Tap SOS Speed Dialers: Direct calling links for 112 (National Emergency), 1077 (District
+  Control), 1070 (SDMA), and 108 (Ambulance).
+- Relief Camps Registry: Active designated municipal shelter locations with bed capacity and
+  medical station flags.
+
+[FEATURE 8: Rural 2G/3G SMS & Automated IVR Voice Broadcast]
+- Direct Real-Number WhatsApp Dispatch: 1-click button opening WhatsApp with pre-formatted
+  localized weather bulletins ready to send to any mobile number.
+- Native Device SMS Trigger: Opens default SMS messenger app with standard 160-character
+  cellular text alerts.
+- Automated IVR Voice Simulation: SpeechSynthesis voice briefing in farmer's regional dialect.
+
+[FEATURE 9: 1-Click Agro-Meteorological Bulletin Exporter]
+- IMD-Branded Printable & PDF Bulletins: Formatted document with 3-day forecast, spraying
+  advisory, and emergency warnings.
+- Share to WhatsApp: Formatted text snippet ready for farmer WhatsApp groups.
+
+[FEATURE 10: 30-Year Climate Benchmark & Monsoon Deviation]
+- 1991–2020 Long-Period Average (LPA): Compares live district temperature against the 30-year
+  normal baseline to detect micro-climate warming or monsoon delays.
+
+[FEATURE 11: Persistent Geolocation & Live Background Auto-Sync Engine]
+- Silent GPS & LocalStorage State: Checks browser coordinates and caches active location in
+  localStorage. The platform never resets unexpectedly to "Delhi" on refresh.
+- Live Background Polling: Synchronizes observations every 2.5 minutes in the background with
+  a visual status indicator (`🟢 Auto-Sync • 12s ago [↻]`).
+
+----------------------------------------------------------------------------------------
+3. PROJECT REPOSITORY STRUCTURE
+----------------------------------------------------------------------------------------
+weathergpt/
+├── backend/
+│   ├── app/
+│   │   ├── main.py                     # FastAPI application router & lifespan
+│   │   ├── config.py                   # Environment & key settings
+│   │   ├── services/
+│   │   │   ├── chat_service.py         # Multi-turn Groq + Gemini LLM fallback chain
+│   │   │   ├── weather_service.py      # Open-Meteo & IMD data fetcher
+│   │   │   └── alert_service.py        # Severity threshold classifier
+│   │   └── schemas/                    # Pydantic data validation models
+│   └── Dockerfile.backend              # Optimized Python 3.11 container
+├── frontend/
+│   └── web/
+│       ├── app/
+│       │   ├── page.tsx                # Master state coordinator & modal orchestrator
+│       │   ├── layout.tsx              # Root HTML layout & fonts
+│       │   └── api/                    # Next.js edge API route proxies
+│       ├── components/
+│       │   ├── Header.tsx              # Clean top nav, global search & vernacular selector
+│       │   ├── WeatherGlobe.tsx        # Three.js 3D WebGL rotating earth & weather particles
+│       │   ├── WeatherSummaryCard.tsx  # Dockable live metric card & quick sensor pills
+│       │   ├── DetailedForecastPanel.tsx # 7-day & 15-day expandable forecast panel
+│       │   ├── ChatInputBar.tsx        # Floating multi-turn AI assistant with voice input
+│       │   ├── LightningProximityModal.tsx # IITM/IMD convective lightning risk analyzer
+│       │   ├── SatelliteViewerModal.tsx  # ISRO INSAT-3DR geostationary cloud & radar visualizer
+│       │   ├── SmartCropCalendarModal.tsx# KVK GDD crop phenology & pest remedy engine
+│       │   ├── DisasterReliefModal.tsx # NDMA flood inundation simulator & 1-tap SOS
+│       │   ├── RuralSmsSimulatorModal.tsx# Real WhatsApp/SMS dispatch & IVR voice simulator
+│       │   ├── WeatherBulletinExportModal.tsx # 1-click PDF & WhatsApp bulletin exporter
+│       │   ├── SectorAdvisoryModal.tsx # Agriculture, Aviation, Disaster, Health intelligence
+│       │   ├── ClimateBenchmarkModal.tsx # 30-year IMD climatological normal baseline
+│       │   ├── WeatherRadarModal.tsx   # Interactive synoptic radar map with layer toggles
+│       │   └── LocationSearchBar.tsx   # Device-native search with GPS autodetect
+│       ├── lib/
+│       │   ├── translations.ts         # Complete dictionaries for 7 Indian languages
+│       │   └── api.ts                  # Client-side API fetch client
+│       └── Dockerfile.frontend         # Multi-stage Alpine Node.js Next.js container
+├── docker-compose.yml                  # Unified multi-container orchestrator
+├── README.md                           # Official repository markdown documentation
+└── SIH_PROJECT_COMPREHENSIVE_OVERVIEW.txt # Complete technical dossier & reference
+========================================================================================

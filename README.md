@@ -1,321 +1,214 @@
-# WeatherGPT 🌤️
+# 🌦️ WeatherGPT — Next-Generation Meteorological AI & Climate Intelligence Platform
 
-AI-powered weather forecasting assistant with multilingual support and role-based responses for Smart India Hackathon 2026.
+> **Smart India Hackathon (SIH) 2026 Submission**  
+> *Next-Gen AI-Powered Agro-Meteorological Intelligence, Multi-Hazard Early Warning System, ISRO Satellite Telemetry, and Last-Mile Vernacular Decision Support.*
 
-> **Latest Update (v1.1.0)**: New black-white-yellow UI theme, auto-login with API key management, improved LLM response handling, and cleaner interface.
+---
 
-## 🌟 Features
+## 🌟 Executive Summary & Problem Statement Alignment
 
-### User-Provided API Keys
-- **Bring Your Own Keys**: Users provide their own free Groq/Gemini API keys during registration
-- **Secure Storage**: API keys encrypted in database using Fernet encryption
-- **Auto-Login**: Returning users automatically logged in with stored credentials
-- **Two-Tier LLM**: Primary (Groq) → Secondary (Gemini) fallback for reliability
+Conventional weather applications provide raw meteorological numbers (e.g., *32°C, 78% humidity, 14 km/h wind*) that leave farmers, emergency responders, pilots, and everyday citizens to guess what actions they should take. In disaster-prone rural regions, complex interfaces and lack of native vernacular support create a dangerous last-mile communication gap.
 
-### Multi-Language Support
-- **10 Indian Languages**: English, Hindi (हिन्दी), Tamil (தமிழ்), Telugu (తెలుగు), Bengali (বাংলা), Marathi (मराठी), Kannada (ಕನ್ನಡ), Gujarati (ગુજરાતી), Malayalam (മലയാളം), Punjabi (ਪੰਜਾਬੀ)
-- Real-time language switching with native script support
-- Natural language processing in user's preferred language
-- Full pipeline language preservation (input → processing → output)
+**WeatherGPT** bridges this gap by transforming raw multi-source atmospheric data into **actionable, sector-specific, and vernacular decision intelligence**. Powered by an interactive 3D WebGL planetary engine, dual-tier LLMs (Groq LLaMA 3.3 70B & Google Gemini), ISRO INSAT-3DR satellite telemetry, and direct WhatsApp/SMS rural dispatches, WeatherGPT delivers life-saving and crop-saving insights to every citizen in their native dialect.
 
-### Role-Based Responses
-- **Citizen**: Everyday weather information for daily planning
-- **Farmer**: Agricultural insights, crop-relevant forecasts
-- **Pilot**: Aviation weather data, visibility, wind conditions
-- **Emergency Services**: Critical weather alerts and risk assessment
+---
 
-### Professional UI Design
-- **Black-White-Yellow Theme**: Clean, modern, accessible color scheme
-- **Dark Mode Support**: Seamless light/dark theme switching
-- **Optimized Dropdowns**: Clear backgrounds for location and language selectors
-- **Minimal Interface**: Focused on core functionality without clutter
+## 🚀 Key Innovations & Flagship Features
 
-### Lightweight Authentication & Personalization
-- **Email-based login**: Simple authentication with encrypted API key storage
-- **Occupation-aware responses**: AI tailors answers based on your work (e.g., "Rice farmer in Punjab")
-- **Fair-use rate limiting**: 50 questions per user per 24 hours (configurable)
-- **SQLite for demo**: Easy upgrade path to PostgreSQL for production
-- 📖 **[Complete Authentication Documentation](./AUTHENTICATION.md)**
+### 1. 🌍 Interactive 3D WebGL Planetary Climate Globe
+- **Custom Three.js Sphere**: Real-time rotating Earth globe with atmospheric haze shaders, sun lighting vectors, and cloud textures.
+- **Dynamic Weather Particles**: Visual rain precipitation, cloud density, and sunlight levels synchronizing in real-time with selected district coordinates.
+- **Dockable & Minimizable UI**: Toggle between deep multi-metric analytics and an unobstructed planetary visualization.
 
-### Weather Alerts System
-- **Server-side severity classification** with configurable thresholds
-- **Proactive monitoring** of weather conditions with automatic alert generation
-- **5 severity levels**: Normal, Watch, Warning, Severe, Extreme
-- **Alert types**: Heatwave, Heavy Rain, High Wind, Frost/Freeze, Storm
-- **Real-time breach detection** and alert storage in database
+### 2. ⚡ IITM / IMD DAMINI Lightning & Convective Instability Analyzer
+- **Meteorological Convective Instability Index**: Analyzes thermal energy, dew-point moisture, and convective cloud codes.
+- **Plain-Language Risk Categorization**:
+  - 🟢 **SAFE**: Zero convective thunderstorm cells within 30 km radius. Safe for field work and construction.
+  - 🟡 **CAUTION**: Convective cloud buildup in progress. Potential isolated discharges in 1–2 hours.
+  - 🔴 **DANGER**: Active lightning and convective storm cell. Instant recommendation to suspend open-field operations.
+- **Ground Sensor Telemetry**: Nearest strike distance (km), past 30-minute discharge counts, and storm movement vectors.
+- **NDMA / IMD 30-30 Safety Directives**: Plain guidelines for rural field safety.
 
-### Real-Time Weather Data
-- Current conditions and forecasts
-- 7-day weather predictions
-- Hourly updates
-- Multiple Indian cities supported
+### 3. 🛰️ ISRO INSAT-3DR Geostationary Satellite & Synoptic Radar Visualizer
+- **Spaceborne Satellite Streams**: Centered over the Indian Subcontinent ($74^\circ\text{E}$ orbital position).
+- **Multi-Channel Synoptic Layers**:
+  - **Cloud Satellite Cover**: High-resolution Infrared cloud-top structure and thermal height scale.
+  - **Precipitation Radar**: Live radar reflectivity showing active rain and storm cells.
+  - **Wind Circulation**: Dynamic streamline vectors showing monsoon currents and pressure gradients.
+- **Plain-Language Satellite Telemetry Summary**: Explains what spaceborne sensors see over the target district in plain terms.
 
-## 🚀 Quick Start with Docker
+### 4. 🌾 Krishi Vigyan Kendra (KVK) Smart Crop Phenology & GDD Engine
+- **Growing Degree Days (GDD) Accumulator**: Tracks thermal unit accumulation based on Days After Sowing (DAS).
+- **Major Indian Crops Supported**: *Paddy (Rice), Cotton, Wheat, Mustard, Sugarcane, Soybean*.
+- **Phenological Growth Stages**: Vegetative, Tillering, Panicle Initiation, Flowering, Dough, and Physiological Maturity.
+- **Weather-Triggered Pest & Disease Warning**: Calculates fungal spore germination risk (e.g., *Blast, False Smut, Pink Bollworm, Yellow Rust*) and recommends precise bio-pesticide and chemical remedies.
 
-### Prerequisites
-- Docker & Docker Compose installed
-- Users provide their own free API keys at first login:
-  - [Groq API Key](https://console.groq.com) (Primary LLM - fast)
-  - [Gemini API Key](https://aistudio.google.com/app/apikey) (Secondary LLM - fallback)
-- Keys are encrypted and stored per user in the database
+### 5. 🚨 NDMA Multi-Hazard Disaster Hub & Emergency SOS
+- **Cloudburst & Rainfall Inundation Simulator**: Interactive slider ($10\text{ mm} \rightarrow 200\text{ mm}$) calculating flood inundation envelope, drain runoff, and low-lying vulnerability.
+- **1-Tap Emergency Speed Dialers**: Direct phone triggers for:
+  - `112`: National Emergency Response Support System (ERSS)
+  - `1077`: District Disaster Control Room
+  - `1070`: State Disaster Management Authority (SDMA)
+  - `108`: Emergency Medical & Ambulance Service
+- **Relief Camp Directory**: Active municipal shelter locations with bed capacity and emergency medical facilities.
 
-### Setup
+### 6. 📲 Rural 2G/3G SMS & Automated IVR Voice Broadcast
+- **Direct Real-Number WhatsApp Dispatch**: 1-click instant delivery of localized weather & agricultural bulletins directly to the farmer's WhatsApp number.
+- **Native Device SMS Protocol**: Generates standard 160-character cellular SMS alerts compatible with basic feature phones.
+- **Vernacular Audio Voice Call Simulation**: Text-To-Speech audio bulletin synthesizer reading out advisories in regional Indian dialects.
 
-1. **Clone the repository:**
-```bash
-git clone https://github.com/krishrana1430/SIH.git
-cd SIH
-```
+### 7. 📋 1-Click Agro-Meteorological Weather Bulletin Exporter
+- **Official IMD/WeatherGPT Formatted Reports**: Generates downloadable, high-res PDF and printable bulletins.
+- **Share to WhatsApp**: Instant share link formatted for farmer WhatsApp groups and agricultural cooperatives.
 
-2. **Configure environment:**
-```bash
-cp .env.example .env
-# Optional: Edit .env to add admin-level API keys (users will provide their own at login)
-```
+### 8. 📊 30-Year Climatological Benchmark & Monsoon Deviation
+- **Long-Period Average (LPA) Comparison**: Compares live observation against IMD's 30-year climatological baseline (1991–2020).
+- **Monsoon Anomaly Detector**: Identifies deficit vs. excess rainfall trends and heatwave anomalies.
 
-3. **Start services:**
-```bash
-docker-compose up -d
-```
+### 9. 🌐 Full Vernacular Localization (7 Regional Indian Languages)
+- Real-time localization across UI, live metrics, forecast panels, satellite interpretations, advisories, and AI chat responses:
+  - 🇬🇧 **English**
+  - 🇮🇳 **हिन्दी (Hindi)**
+  - 🇮🇳 **मराठी (Marathi)**
+  - 🇮🇳 **தமிழ் (Tamil)**
+  - 🇮🇳 **తెలుగు (Telugu)**
+  - 🇮🇳 **বাংলা (Bengali)**
+  - 🇮🇳 **ગુજરાતી (Gujarati)**
 
-4. **Access the application:**
-- **Frontend**: http://localhost:3000
-- **Backend API**: http://localhost:8000
-- **API Documentation**: http://localhost:8000/docs
+### 10. 📍 Persistent Geolocation & Live Background Auto-Sync
+- **Zero Location Drift**: Auto-detects GPS silently on first launch and caches the user's active district in `localStorage`. Reloading or refreshing never resets your location.
+- **Live Background Auto-Sync**: Automatically synchronizes observation data every 2.5 minutes with a live countdown status indicator (`🟢 Auto-Sync • 12s ago [↻]`).
 
-5. **First-time user setup:**
-- Users provide their own free Groq and Gemini API keys at first login
-- Keys are encrypted and stored securely in the database, tied to their email
-- No API keys = no additional costs for deployment
+### 11. 🧠 Dual-Tier LLM Architecture with Multi-Turn Conversational Memory
+- **Tier 1 (Primary)**: Groq Cloud — LLaMA 3.3 70B Versatile ($<500\text{ ms}$ ultra-low latency response).
+- **Tier 2 (Fallback)**: Google Gemini 1.5/2.5 Flash (Seamless automatic failover).
+- **Decoupled Conversational Context**: Chat drawer retains multi-turn memory without interfering with or overwriting the primary dashboard location.
 
-## 🏗️ Architecture
+---
+
+## 🏗️ System Architecture
 
 ```
-WeatherGPT
-├── Backend (Python FastAPI)
-│   ├── LLM Chain (2-Tier Fallback: Groq → Gemini)
-│   │   ├── Tier 1: Groq (Primary - fast, free tier)
-│   │   └── Tier 2: Gemini (Fallback - reliable, free tier)
-│   ├── Weather Service (Open-Meteo API)
-│   └── Alert Monitoring Service
-├── Frontend (Next.js + React)
-│   ├── Chat Interface
-│   └── Weather Dashboard
-└── Database (SQLite)
-    └── User Data & Encrypted API Keys
+                               ┌──────────────────────────────────────────────────────────┐
+                               │                    WEATHERGPT FRONTEND                   │
+                               │           (Next.js 14 App Router, React, Tailwind)       │
+                               └────────────────────────────┬─────────────────────────────┘
+                                                            │
+                     ┌──────────────────────────────────────┼──────────────────────────────────────┐
+                     │                                      │                                      │
+                     ▼                                      ▼                                      ▼
+        ┌─────────────────────────┐            ┌─────────────────────────┐            ┌─────────────────────────┐
+        │   3D Planetary Engine   │            │   Interactive Modals    │            │  Decoupled AI Chat Bar  │
+        │  (Three.js WebGL Globe) │            │  - DAMINI Lightning     │            │  - Multi-Turn Memory    │
+        │  - Dynamic Shaders      │            │  - KVK Crop Phenology   │            │  - Role-Based Persona   │
+        │  - Atmosphere Vectors   │            │  - ISRO Satellite Feed  │            │  - Vernacular Output    │
+        │  - Particle Weather     │            │  - NDMA Disaster Hub    │            │  - Voice Audio Input    │
+        │                         │            │  - Rural SMS/WhatsApp   │            │                         │
+        └─────────────────────────┘            └─────────────────────────┘            └────────────┬────────────┘
+                                                                                                   │
+                                                                                                   ▼
+                                                                                      ┌─────────────────────────┐
+                                                                                      │      FastAPI Server     │
+                                                                                      │     (Python 3.11)       │
+                                                                                      └────────────┬────────────┘
+                                                                                                   │
+                                                  ┌────────────────────────────────────────────────┼─────────────────────────────────┐
+                                                  ▼                                                ▼                                 ▼
+                                     ┌─────────────────────────┐                      ┌─────────────────────────┐       ┌─────────────────────────┐
+                                     │    Open-Meteo & IMD     │                      │      Groq Cloud LLM     │       │    Google Gemini LLM    │
+                                     │  Meteorological Ingest  │                      │    (LLaMA 3.3 70B)      │       │     (Flash Fallback)    │
+                                     │  - Current Conditions   │                      │  - Primary Synthesizer  │       │  - Auto Failover Engine │
+                                     │  - 7 & 15 Day Forecast  │                      │  - <500ms Token Stream  │       │  - Zero Downtime Link   │
+                                     │  - Convective Indices   │                      └─────────────────────────┘       └─────────────────────────┘
+                                     └─────────────────────────┘
 ```
 
-### LLM Two-Tier Fallback Strategy
+---
 
-WeatherGPT implements a resilient two-tier LLM provider chain with **user-provided API keys**:
+## 💻 Tech Stack
 
-- **Tier 1 (Primary)**: Groq API - Fast inference with generous free tier
-- **Tier 2 (Secondary)**: Google Gemini - Reliable fallback with free tier
+| Layer | Technology |
+|---|---|
+| **Frontend Framework** | Next.js 14 (App Router, TypeScript, React 18) |
+| **Styling & Theme** | Tailwind CSS, Lucide Icons, Custom Yellow-Black Frosted Glass Aesthetic |
+| **3D Graphics** | Three.js, WebGL Shaders, Particle Engines |
+| **Backend API** | Python 3.11, FastAPI, Uvicorn, Pydantic |
+| **Primary LLM** | Groq Cloud (LLaMA 3.3 70B Versatile) |
+| **Secondary LLM** | Google Gemini (Gemini 1.5 Flash / Gemini 2.5) |
+| **Weather Ingest** | Open-Meteo High-Resolution WMO Telemetry, Reverse Geocoding API |
+| **Satellite Imagery** | ISRO INSAT-3DR Geostationary Sector Feeds, Synoptic Radar Stream |
+| **Containerization** | Docker, Docker Compose (Multi-stage alpine/slim builds) |
 
-**Key Features:**
-- Users provide their own free API keys at first login
-- Keys are encrypted and stored per user email in the database
-- Automatic fallback from Groq → Gemini on rate limits or failures
-- Zero API costs for deployment (users bring their own keys)
-- Both providers offer generous free tiers suitable for demos and hackathons
+---
 
-## 🛠️ Tech Stack
+## 📦 Quick Start & Installation
 
-### Backend
-- **Framework**: FastAPI (Python 3.11)
-- **LLM**: Groq (primary), Google Gemini (fallback) - user-provided keys
-- **Weather Data**: Open-Meteo API
-- **Database**: SQLite with encrypted key storage
-- **Voice**: Groq Whisper (STT), Browser TTS
+### Option 1: Docker Compose (Recommended)
 
-### Frontend
-- **Framework**: Next.js 14
-- **UI**: React, TailwindCSS
-- **Components**: Shadcn/ui
-- **Charts**: Recharts
+1. **Clone Repository:**
+   ```bash
+   git clone https://github.com/aryan-kumar-singh-cse/weathergpt.git
+   cd weathergpt
+   ```
 
-### Infrastructure
-- **Containerization**: Docker, Docker Compose
-- **Deployment**: Ready for Kubernetes (config in `infra/k8s/`)
+2. **Configure Environment Variables (`.env`):**
+   ```env
+   GROQ_API_KEY=your_groq_api_key_here
+   GEMINI_API_KEY=your_gemini_api_key_here
+   PORT=8000
+   NEXT_PUBLIC_API_URL=http://localhost:8000
+   ```
 
-## 📚 Documentation
+3. **Build & Start Containers:**
+   ```bash
+   docker compose up --build -d
+   ```
 
-- [Setup Guide](./SETUP.md) - Detailed setup instructions
-- [How to Run](./HOW_TO_RUN.md) - Quick start guide
-- [Authentication System](./AUTHENTICATION.md) - Login and user key management
-- **[Alert Dissemination Architecture](./ALERT_DISSEMINATION_ARCHITECTURE.md) - Extreme weather alert system** ⚡ NEW
-- [API Documentation](./docs/API.md) - Complete API reference
-- [Multilingual Testing](./docs/MULTILINGUAL_TESTING.md) - Language support testing guide
-- [Contributing](./CONTRIBUTING.md) - Contribution guidelines
-- [Documentation Index](./DOCUMENTATION_INDEX.md) - All docs
+4. **Access Web Application:**
+   - **Frontend UI**: [http://localhost:3000](http://localhost:3000)
+   - **FastAPI Documentation**: [http://localhost:8000/docs](http://localhost:8000/docs)
 
-## 🌐 Example Queries in Different Languages
+---
 
-```
-English: "Will it rain in Mumbai tomorrow?"
-Hindi: "दिल्ली में कल बारिश होगी क्या?"
-Tamil: "சென்னையில் இன்று மழை பெய்யுமா?"
-Telugu: "హైదరాబాద్‌లో వాతావరణం ఎలా ఉంది?"
-Bengali: "কলকাতায় আজ আবহাওয়া কেমন?"
-Marathi: "पुण्यात आज पाऊस पडेल का?"
-```
+### Option 2: Local Development Setup
 
-The system understands natural weather queries in all supported languages and responds in the same language.
-
-## 🔧 Development
-
-### Local Development (without Docker)
-
-See [LOCAL_DEVELOPMENT.md](./LOCAL_DEVELOPMENT.md) for detailed instructions.
-
-**Backend:**
+#### Backend Setup (Python)
 ```bash
 cd backend
 python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
+# Windows:
+.\venv\Scripts\activate
+# Linux/macOS:
+source venv/bin/activate
+
 pip install -r ../requirements.txt
-python -m uvicorn backend.api.main:app --reload
+python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
-**Frontend:**
+#### Frontend Setup (Next.js)
 ```bash
 cd frontend/web
 npm install
 npm run dev
 ```
-
-### Environment Variables
-
-Key environment variables (see `.env.example` for full list):
-
-```bash
-# LLM Configuration (optional admin-level keys - users provide their own)
-LLM_PRIMARY_API_KEY=your-groq-key  # Optional: for system-level operations
-LLM_SECONDARY_API_KEY=your-gemini-key  # Optional: for system-level operations
-
-# API Configuration
-API_SECRET_KEY=your-secret-key
-NEXT_PUBLIC_API_URL=http://localhost:8000/api/v1
-```
-
-**Note**: Users provide their own API keys at first login, which are encrypted and stored in the database.
-
-## 🔑 User API Key Management
-
-### How It Works
-
-WeatherGPT uses a **user-provides-own-keys** model for zero-cost deployment:
-
-1. **First Login:**
-   - User enters their email and occupation
-   - System prompts for free Groq and Gemini API keys
-   - Keys are encrypted and stored in the database
-
-2. **Automatic Fallback:**
-   - Primary: User's Groq API key (fast)
-   - Fallback: User's Gemini API key (if Groq fails/rate-limited)
-
-3. **Security:**
-   - Keys are encrypted at rest using API_SECRET_KEY
-   - Keys are tied to user email (isolated per user)
-   - No centralized API costs
-
-### Getting Free API Keys
-
-Both providers offer generous free tiers:
-
-**Groq (Primary):**
-- Visit: https://console.groq.com
-- Free tier: Fast inference, suitable for demos
-- Models: GPT-OSS-20B and others
-
-**Gemini (Fallback):**
-- Visit: https://aistudio.google.com/app/apikey
-- Free tier: Generous rate limits
-- Model: Gemini 2.0 Flash
-
-### Testing the Fallback Chain
-
-```bash
-# Test with user's keys via the chat endpoint
-curl -X POST http://localhost:8000/api/v1/chat \
-  -H "Content-Type: application/json" \
-  -d '{"message": "Hello", "city": "Delhi", "email": "user@example.com"}'
-```
-
-## 🧪 Testing
-
-Comprehensive automated test suite covering API contracts, LLM fallback, severity classification, and end-to-end integration.
-
-### Quick Start
-
-```bash
-# Run all tests
-pytest backend/tests/ -v
-
-# Run with coverage report
-pytest backend/tests/ -v --cov=backend --cov-report=html
-
-# Using test runner script
-python run_tests.py              # All tests
-python run_tests.py fast         # Fast unit tests only
-python run_tests.py coverage     # With coverage report
-```
-
-### Test Coverage
-
-- ✅ **API Contract Tests**: `/api/ask` endpoint validation with valid/invalid inputs
-- ✅ **LLM Fallback Tests**: Three-tier provider chain resilience (primary → secondary → fallback)
-- ✅ **Severity Classification**: Weather threshold boundary testing
-- ✅ **Integration Tests**: End-to-end query flow with database persistence
-- ✅ **Session Management**: User sessions, conversation history, preferences
-
-📖 **[Complete Testing Documentation](./TESTING.md)** - Detailed guide on running tests, fixtures, mocking strategy, and CI integration
-
-## 📱 Features in Detail
-
-### Intelligent Weather Queries
-- Natural language understanding
-- Context-aware responses
-- Historical data analysis
-- Weather trend predictions
-
-### Multi-City Support
-- Major Indian cities pre-configured
-- Custom location search
-- Geolocation support
-
-### Accessibility
-- Screen reader compatible
-- Keyboard navigation
-- High contrast mode
-- Voice interface
-
-## 🤝 Contributing
-
-We welcome contributions! Please see [CONTRIBUTING.md](./CONTRIBUTING.md) for guidelines.
-
-## 📄 License
-
-This project is developed for Smart India Hackathon 2026.
-
-## 👥 Team
-
-SIH 2026 Team - WeatherGPT
-
-## 🙏 Acknowledgments
-
-- **Open-Meteo**: Free weather API
-- **Groq**: Fast LLM inference
-- **Google Gemini**: AI capabilities
-- **Smart India Hackathon**: Opportunity and platform
-
-## 📞 Support
-
-For issues and questions:
-- Create an issue on GitHub
-- Check [Documentation Index](./DOCUMENTATION_INDEX.md)
+Open [http://localhost:3000](http://localhost:3000) in your browser.
 
 ---
 
-Built with ❤️ for Smart India Hackathon 2026
+## 📡 API Endpoints Reference
+
+| Endpoint | Method | Description |
+|---|---|---|
+| `/api/chat` | `POST` | Multi-turn conversational meteorological LLM reasoning (Groq $\rightarrow$ Gemini fallback) |
+| `/api/geocode` | `GET` | Fuzzy reverse & forward geocoding for Indian districts, tehsils, and global locations |
+| `/api/weather/current` | `GET` | High-precision WMO current weather observations |
+| `/api/weather/forecast` | `GET` | 7-day and 15-day extended agro-meteorological outlook |
+| `/api/user/preferences` | `GET` / `PATCH` | Role persona (`Farmer`, `Pilot`, `Disaster Response`, `Citizen`) and language preferences |
+| `/health` | `GET` | Container health check and service latency diagnostics |
+
+---
+
+## 👥 Contributors & Credits
+- **Project**: WeatherGPT (SIH 2026 Submission)
+- **Repository**: [https://github.com/aryan-kumar-singh-cse/weathergpt](https://github.com/aryan-kumar-singh-cse/weathergpt)
+- **Branch**: `dev`
