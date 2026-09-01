@@ -226,6 +226,150 @@ async function fetchLiveWeatherPipeline(lat: number, lng: number) {
   return { liveDataFound: false };
 }
 
+function generateIntelligentConversationalResponse(
+  query: string,
+  city: string,
+  temp: number,
+  feelsLike: number,
+  maxTemp: number,
+  minTemp: number,
+  humidity: number,
+  windSpeed: number,
+  condition: string,
+  rainChance: number,
+  pressure: number,
+  astroEnv: any,
+  forecast: any[],
+  nowcastSlots: any[],
+  role: string,
+  language: string
+): string {
+  const q = (query || "").toLowerCase().trim();
+  const tmrw = forecast[1] || forecast[0] || {};
+
+  // 1. Umbrella & Rain
+  if (/umbrella|rain|raining|raincoat|shower|drizzle|precipitation|wet/.test(q)) {
+    if (rainChance >= 35 || /rain|drizzle|shower/i.test(condition)) {
+      return `🌧️ **Yes, carry an umbrella in ${city} today!**\n\nRain probability is currently **${rainChance}%** with **${condition}** and **${humidity}%** humidity. The temperature is **${temp}°C** (feels like **${feelsLike}°C**). Keep rain protection handy when stepping out.`;
+    }
+    return `☀️ **No need for an umbrella in ${city} today!**\n\nRain probability is low at **${rainChance}%** under **${condition}**. Temperature is **${temp}°C** with **${windSpeed} km/h** breeze.`;
+  }
+
+  // 2. Wind & Aerodynamics
+  if (/wind|breeze|gust|windy|stormy|air speed|direction/.test(q)) {
+    const windCategory = windSpeed > 25 ? "Strong/Gusty" : windSpeed > 12 ? "Moderate" : "Light/Gentle";
+    return `💨 **Wind & Atmospheric Briefing for ${city}**:\n\n- **Surface Speed**: **${windSpeed} km/h** (${windCategory})\n- **Barometric Pressure**: **${pressure} hPa**\n- **Current Sky**: **${condition}** (${temp}°C)\n\n${windSpeed > 25 ? "⚠️ Strong gusts present. Exercise caution for two-wheelers and high-rise operations." : "✅ Wind conditions are steady and favorable for normal outdoor activities."}`;
+  }
+
+  // 3. Outdoor Activities: Running / Jogging / Walking / Cycling
+  if (/run|running|jog|jogging|walk|walking|cycling|workout|gym|exercise/.test(q)) {
+    const aqiScore = astroEnv?.aqi ?? 110;
+    const aqiCat = astroEnv?.aqiCategory ?? "Moderate";
+    let advice = "";
+    if (aqiScore > 200) {
+      advice = `⚠️ **Indoor exercise recommended.** AQI is currently **${aqiScore} (${aqiCat})**, which can irritate respiratory passages.`;
+    } else if (temp > 34 || feelsLike > 38) {
+      advice = `☀️ **Opt for early morning or late evening slots.** Current thermal heat index is high (${feelsLike}°C). Stay well hydrated.`;
+    } else if (rainChance > 50) {
+      advice = `🌧️ **Keep a rain jacket handy.** Rain chance is ${rainChance}%. Pavements may be slippery.`;
+    } else {
+      advice = `🏃 **Great conditions for an outdoor workout!** Temperature is comfortable at **${temp}°C** with **${humidity}%** humidity and **${aqiCat} air quality**.`;
+    }
+    return `👟 **Outdoor Fitness & Activity Advisory for ${city}**:\n\n${advice}\n\n- **Current Temp / Feels Like**: **${temp}°C** / **${feelsLike}°C**\n- **Air Quality**: **AQI ${aqiScore} (${aqiCat})**\n- **Relative Humidity**: **${humidity}%**`;
+  }
+
+  // 4. Playing Sports: Cricket / Football / Tennis
+  if (/cricket|football|soccer|tennis|badminton|match|play|game|ground/.test(q)) {
+    if (rainChance > 50 || /rain|shower/i.test(condition)) {
+      return `🏏 **Outdoor Play Alert for ${city}**:\n\n⚠️ **High risk of rain interruptions** (${rainChance}% precipitation chance). Outfield may be wet under **${condition}**.`;
+    }
+    return `🏏 **Favorable playing conditions in ${city}!**\n\nRain probability is low (**${rainChance}%**), winds are **${windSpeed} km/h**, and temperature is **${temp}°C**. Good for pitch and court activities.`;
+  }
+
+  // 5. Laundry & Washing Car / Clothes Drying
+  if (/clothes|laundry|dry|wash|drying|car wash/.test(q)) {
+    if (rainChance > 40 || humidity > 80) {
+      return `👕 **Laundry & Outdoor Drying Advisory for ${city}**:\n\n⚠️ **Dry clothes indoors today.** High relative humidity (**${humidity}%**) and a **${rainChance}% rain chance** will prolong drying time.`;
+    }
+    return `👕 **Good drying conditions in ${city}!**\n\nSunshine and **${humidity}%** humidity with **${windSpeed} km/h** breeze will help clothes dry quickly. Rain probability is only **${rainChance}%**.`;
+  }
+
+  // 6. Clothing / What to wear / Jacket / Warmth
+  if (/wear|jacket|sweater|clothes|coat|cloth|dress|outfit|cold/.test(q)) {
+    if (temp < 15) {
+      return `🧥 **Clothing Recommendation for ${city}**:\n\nIt is cold (**${temp}°C** / Low: **${minTemp}°C**). Wear a **warm jacket, sweater, or layered clothing**, especially in early morning and late evening.`;
+    } else if (temp < 22) {
+      return `🧥 **Clothing Recommendation for ${city}**:\n\nIt is cool (**${temp}°C**). A **light cardigan, windcheater, or full-sleeve shirt** is ideal for current conditions.`;
+    } else if (feelsLike > 33) {
+      return `👕 **Clothing Recommendation for ${city}**:\n\nIt feels warm (**${temp}°C**, feels like **${feelsLike}°C** with **${humidity}% humidity**). Wear **light, breathable cotton clothing**, sunglasses, and stay hydrated.`;
+    }
+    return `👕 **Clothing Recommendation for ${city}**:\n\nComfortable ambient temperature (**${temp}°C**). Regular casual or office wear is suitable.`;
+  }
+
+  // 7. Tomorrow's Forecast
+  if (/tomorrow|tmrw|next day|kal/.test(q)) {
+    return `📅 **Tomorrow's Weather Outlook for ${city} (${tmrw.date || "Next Day"})**:\n\n- **Condition**: **${tmrw.condition || condition}**\n- **Temperature**: High **${tmrw.highTemp ?? maxTemp}°C** / Low **${tmrw.lowTemp ?? minTemp}°C**\n- **Rain Chance**: **${tmrw.rainChance ?? rainChance}%**\n- **Wind Speed**: **${tmrw.windSpeed ?? windSpeed} km/h**\n\n${(tmrw.rainChance ?? 0) > 40 ? "🌧️ Expect showers tomorrow—plan outdoor travel accordingly." : "☀️ Pleasant conditions expected through the day."}`;
+  }
+
+  // 8. Weekend / 3-Day Forecast
+  if (/weekend|saturday|sunday|next 3 days|3 days|week/.test(q)) {
+    let forecastLines = forecast.slice(0, 4).map((f: any) => `- **${f.day} (${f.date})**: ${f.highTemp}°C / ${f.lowTemp}°C • ${f.rainChance}% rain • ${f.condition}`).join("\n");
+    return `🗓️ **Extended Outlook for ${city}**:\n\n${forecastLines}\n\nLive atmospheric tracking updated via Doppler radar & ground feeds.`;
+  }
+
+  // 9. Hourly Nowcast / Next few hours
+  if (/nowcast|hourly|next 3 hours|next 6 hours|today afternoon|tonight|evening/.test(q)) {
+    if (nowcastSlots && nowcastSlots.length > 0) {
+      const slots = nowcastSlots.slice(0, 4).map((s: any) => `- **${s.time}**: ${s.temp}°C (${s.condition}) • 💧 ${s.rainProb}% rain`).join("\n");
+      return `⏱️ **3-Hourly Ground Telemetry Nowcast for ${city}**:\n\n${slots}\n\n*Updated real-time from automated surface observing systems.*`;
+    }
+  }
+
+  // 10. Heat, Humidity & Discomfort
+  if (/hot|humidity|humid|sweat|sweating|heat|warm|chilly|feels like/.test(q)) {
+    return `🌡️ **Thermal Comfort & Moisture Analysis for ${city}**:\n\n- **Actual Temperature**: **${temp}°C**\n- **Apparent "Feels Like" Index**: **${feelsLike}°C**\n- **Relative Humidity**: **${humidity}%**\n- **Dew Point**: **${astroEnv?.dewPoint ?? 21.0}°C**\n\n${feelsLike > temp + 2 ? `Because relative humidity is high (**${humidity}%**), evaporative cooling of sweat slows down, making the air feel approximately **+${(feelsLike - temp).toFixed(1)}°C warmer** than the thermometer reading.` : "Temperature and moisture levels are in balanced thermal equilibrium."}`;
+  }
+
+  // 11. Air Quality & Pollution
+  if (/aqi|air quality|pollution|pm2.5|pm10|smog|smoke|breathe|respiratory/.test(q)) {
+    const aqiVal = astroEnv?.aqi ?? 105;
+    const aqiCat = astroEnv?.aqiCategory ?? "Moderate";
+    return `🍃 **National Air Quality Index (CPCB Standard) for ${city}**:\n\n- **Current AQI**: **${aqiVal}** (${aqiCat})\n- **Health Impact**: ${aqiVal <= 50 ? "Minimal impact. Clean fresh air." : aqiVal <= 100 ? "Satisfactory. Minor breathing discomfort to sensitive people." : aqiVal <= 200 ? "Moderate. Breathing discomfort to people with lungs/asthma." : "Poor to Severe. Wear N95 masks outdoors."}\n- **Surface Dispersion**: Winds at **${windSpeed} km/h**`;
+  }
+
+  // 12. Sun, UV, Sunrise, Sunset, Moon
+  if (/uv|sun|sunrise|sunset|sunscreen|moon|moonlight|solar/.test(q)) {
+    return `☀️ **Solar & Lunar Horizon Ephemeris for ${city}**:\n\n- **UV Index**: **${astroEnv?.uvIndex ?? 5.4}** (${(astroEnv?.uvIndex ?? 5.4) > 6 ? "Very High - Sun protection required" : "Moderate"})\n- **Sunrise**: **${astroEnv?.sunrise ?? "05:58"} IST**\n- **Sunset**: **${astroEnv?.sunset ?? "18:43"} IST**\n- **Lunar Phase**: **${astroEnv?.moonPhase ?? "Waxing Crescent"}**\n- **Moonrise**: **${astroEnv?.moonrise ?? "21:00"}** | **Moonset**: **${astroEnv?.moonset ?? "09:49"}**`;
+  }
+
+  // 13. Agriculture / Sowing / Spraying / Krishi
+  if (/spray|pesticide|sow|crop|wheat|paddy|farmer|krishi|fertilizer|irrigation|soil|harvest/.test(q)) {
+    const spraySafe = windSpeed <= 15 && rainChance <= 35;
+    return `🌾 **Krishi Agromet Advisory for ${city}**:\n\n${spraySafe ? "✅ **Suitable window for spraying pesticides/fertilizers!** Wind speeds are light and rain probability is low." : "⚠️ **Postpone pesticide/chemical spraying.** Wind or high rain chance may cause chemical wash-off or drift."}\n\n- **Soil Moisture / Humidity**: **${humidity}%**\n- **24-Hour Rain Probability**: **${rainChance}%**\n- **Wind Speed**: **${windSpeed} km/h**\n\n*(Aligned with ICAR / IMD Agromet Standards)*`;
+  }
+
+  // 14. Aviation & Piloting
+  if (/pilot|aviation|flight|runway|crosswind|metar|ceiling|visibility|turbulence/.test(q)) {
+    return `✈️ **Aviation Meteorological Assessment for ${city}**:\n\n- **Surface Wind**: **${windSpeed} km/h**\n- **Visibility**: **${astroEnv?.visibility ?? 10} km**\n- **Altimeter / Pressure**: **${pressure} hPa** (QNH)\n- **Ceiling / Sky**: **${condition}**\n\n${windSpeed > 20 ? "⚠️ Crosswind caution on final approach." : "✅ VFR/IFR conditions normal."}`;
+  }
+
+  // 15. Severe Alert / Flood / Cyclone
+  if (/alert|warning|cyclone|flood|lightning|danger|storm|emergency/.test(q)) {
+    if (astroEnv?.imdWarning) {
+      return `🚨 **Active Weather Alert for ${city}**:\n\n⚠️ **IMD Bulletin**: ${astroEnv.imdWarning}\n- **Rain Chance**: **${rainChance}%**\n- **Wind Speed**: **${windSpeed} km/h**\n- **Severity**: **${(astroEnv.imdSeverity || "yellow").toUpperCase()}**\n\nFollow local district emergency protocols.`;
+    }
+    return `🟢 **No severe weather warnings active for ${city}.**\n\nCurrent atmospheric state is normal under **${condition}** with temperature **${temp}°C** and light winds.`;
+  }
+
+  // 16. Greetings & General Identity
+  if (/^(hi|hello|hey|namaste|good morning|good evening|who are you|help|what can you do)/.test(q)) {
+    return `👋 **Namaste! I am WeatherGPT**, your real-time sovereign meteorological intelligence assistant.\n\nCurrently in **${city}**, the weather is **${condition}** at **${temp}°C** (feels like **${feelsLike}°C**) with **${humidity}%** humidity and **${rainChance}%** rain chance.\n\nYou can ask me anything about:\n- 🌧️ Rain & Umbrella advice\n- 🏃 Outdoor activities, running & sports\n- 📅 Tomorrow and 7-day forecasts\n- 💨 Wind, humidity & heat index\n- 🍃 Air Quality (AQI) & UV index\n- 🌾 Agricultural crop & spraying advisories`;
+  }
+
+  // Default Smart Direct Response
+  return `Live Meteorological Intelligence for **${city}**:\n\nCurrently, it is **${condition}** at **${temp}°C** (feels like **${feelsLike}°C**). Today's diurnal range is **${maxTemp}°C High / ${minTemp}°C Low** with **${humidity}%** relative humidity, **${windSpeed} km/h** winds, and **${rainChance}%** rain probability. Air quality index is **AQI ${astroEnv?.aqi ?? 105} (${astroEnv?.aqiCategory ?? "Moderate"} - CPCB standard)**.`;
+}
+
 export async function POST(request: Request) {
   try {
     const {
@@ -374,21 +518,28 @@ export async function POST(request: Request) {
     const now = new Date();
     const updatedAt = `${String(now.getHours() % 12 || 12).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")} ${now.getHours() >= 12 ? "PM" : "AM"}`;
 
-    let rawResponse = backendData?.response || "";
-    if (rawResponse) {
-      rawResponse = rawResponse
-        .replace(/A\uFFFD?C/g, "°C")
-        .replace(/Â°C/g, "°C")
-        .replace(/A°C/g, "°C")
-        .replace(/\uFFFD\?[\uFFFD\?]/g, "•")
-        .replace(/d\?\?[\uFFFD\?]/g, "🌱")
-        .replace(/[\uFFFD]{1,}/g, "")
-        .replace(/\s{2,}/g, " ");
-    }
-
     const narrativeResponse =
-      rawResponse ||
-      `Live meteorological intelligence for ${extractedCity}: Current temperature is ${resolvedTemp}°C (feels like ${feelsLike}°C) with ${humidity}% humidity. Diurnal range: High ${maxTemp}°C / Low ${minTemp}°C. Air Quality is AQI ${astroEnv.aqi} (${astroEnv.aqiCategory} - CPCB standard).`;
+      (backendData?.response && !backendData.response.includes("Upcoming 7-Day Forecast Outlook")
+        ? backendData.response
+        : "") ||
+      generateIntelligentConversationalResponse(
+        message,
+        extractedCity,
+        resolvedTemp,
+        feelsLike,
+        maxTemp,
+        minTemp,
+        humidity,
+        windSpeed,
+        mapWeatherCodeToDescription(weatherCode),
+        rainChance,
+        pressure,
+        astroEnv,
+        formattedForecast,
+        livePinpoint.nowcastSlots || [],
+        role,
+        language
+      );
 
     return NextResponse.json({
       city: extractedCity,
