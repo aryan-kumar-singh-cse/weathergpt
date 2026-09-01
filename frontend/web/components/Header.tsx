@@ -266,23 +266,9 @@ export default function Header({
             )}
           </div>
 
-          {/* User Profile / Settings Button */}
-          <button
-            onClick={() => setSettingsOpen(true)}
-            aria-label="Profile and Settings"
-            className="w-9 h-9 rounded-full bg-black/80 backdrop-blur-xl border border-yellow-400/30 flex items-center justify-center text-yellow-400 hover:bg-yellow-400/20 transition-all shadow-xl hover:scale-105 active:scale-95 cursor-pointer shrink-0"
-          >
-            <User className="w-4 h-4" />
-          </button>
+          {/* User Profile / Settings Button removed as requested to keep UI clutter-free on main page */}
         </div>
       </header>
-
-      <SettingsPanel
-        isOpen={settingsOpen}
-        onClose={() => setSettingsOpen(false)}
-        initialPreferences={preferences}
-        onSave={onSavePreferences}
-      />
     </>
   );
 }

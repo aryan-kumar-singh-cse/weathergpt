@@ -374,9 +374,21 @@ export async function POST(request: Request) {
     const now = new Date();
     const updatedAt = `${String(now.getHours() % 12 || 12).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")} ${now.getHours() >= 12 ? "PM" : "AM"}`;
 
+    let rawResponse = backendData?.response || "";
+    if (rawResponse) {
+      rawResponse = rawResponse
+        .replace(/A\uFFFD?C/g, "°C")
+        .replace(/Â°C/g, "°C")
+        .replace(/A°C/g, "°C")
+        .replace(/\uFFFD\?[\uFFFD\?]/g, "•")
+        .replace(/d\?\?[\uFFFD\?]/g, "🌱")
+        .replace(/[\uFFFD]{1,}/g, "")
+        .replace(/\s{2,}/g, " ");
+    }
+
     const narrativeResponse =
-      backendData?.response ||
-      `Live weather update for ${extractedCity}: Temperature is ${resolvedTemp}°C (feels like ${feelsLike}°C) with ${humidity}% humidity. High of ${maxTemp}°C / Low of ${minTemp}°C. Air Quality is AQI ${astroEnv.aqi} (${astroEnv.aqiCategory} - CPCB standard).`;
+      rawResponse ||
+      `Live meteorological intelligence for ${extractedCity}: Current temperature is ${resolvedTemp}°C (feels like ${feelsLike}°C) with ${humidity}% humidity. Diurnal range: High ${maxTemp}°C / Low ${minTemp}°C. Air Quality is AQI ${astroEnv.aqi} (${astroEnv.aqiCategory} - CPCB standard).`;
 
     return NextResponse.json({
       city: extractedCity,

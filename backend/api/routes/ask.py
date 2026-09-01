@@ -135,6 +135,8 @@ class AskRequest(BaseModel):
     language: str = "en"
     role: str = "citizen"
     location: Optional[str] = None
+    lat: Optional[float] = None
+    lng: Optional[float] = None
     location_hint: Optional[Dict[str, Any]] = None
     session_id: Optional[str] = None  # Optional session ID in body
     history: Optional[List[Dict[str, Any]]] = None
@@ -228,7 +230,20 @@ async def ask_weather_question(
         explicit_place = intent.get("place")
         generic_words = ["india", "here", "current", "today", "now", "nationwide", "this place"]
 
-        if intent.get("nationwide") and not request.location:
+        if request.lat is not None and request.lng is not None:
+            lat = float(request.lat)
+            lng = float(request.lng)
+            place_name = request.location or explicit_place or "Your Location"
+            place_info = {
+                "lat": lat,
+                "lng": lng,
+                "place_name": place_name,
+                "city": place_name,
+                "state": "",
+                "country": "India",
+                "source": "client_coordinates"
+            }
+        elif intent.get("nationwide") and not request.location:
             lat, lng = 20.5937, 78.9629
             place_info = {
                 "lat": lat,
