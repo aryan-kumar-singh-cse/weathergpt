@@ -397,6 +397,129 @@ function generateIntelligentConversationalResponse(
   return `Live Meteorological Intelligence for **${city}**:\n\nCurrently, it is **${condition}** at **${temp}°C** (feels like **${feelsLike}°C**). Today's diurnal range is **${maxTemp}°C High / ${minTemp}°C Low** with **${humidity}%** relative humidity, **${windSpeed} km/h** winds, and **${rainChance}%** rain probability. Air quality index is **AQI ${astroEnv?.aqi ?? 105} (${astroEnv?.aqiCategory ?? "Moderate"} - CPCB standard)**.\n\nAsk me about 🌧️ rain, 🏃 activities, 📅 forecasts, 💨 wind, 🍃 AQI, 🌾 farming, ✈️ aviation, or 🕒 best time to go out!`;
 }
 
+async function callDirectLLM(
+  userQuery: string,
+  city: string,
+  weatherContext: string,
+  role: string,
+  language: string,
+  history: any[] = []
+): Promise<string | null> {
+  const groqKey = process.env.GROQ_API_KEY;
+  const geminiKey = process.env.GEMINI_API_KEY;
+
+  const systemPrompt = `You are WeatherGPT, an advanced sovereign meteorological AI intelligence assistant.
+You have access to real-time live meteorological telemetry for the user's location.
+
+You can answer ANY question the user asks:
+- Meteorological inquiries (current weather, 7-day outlook, rain probabilities, wind gusts, AQI & pollution, UV index, sunrise/sunset/moon ephemeris, extreme storm alerts).
+- Everyday planning, clothing choices, outdoor fitness (jogging, cycling, cricket), umbrella guidance, car washing, laundry drying.
+- Specialized domain advice: Agricultural Krishi decisions (crop sowing, pesticide spraying, irrigation timing), Aviation/Drone flight operations.
+- General questions, weather science (how clouds form, why sky is blue, monsoon mechanisms), or casual conversational chat.
+
+CURRENT REAL-TIME LOCATION & WEATHER TELEMETRY:
+${weatherContext}
+
+USER ROLE: ${role}
+PREFERRED LANGUAGE: ${language}
+
+CORE INSTRUCTIONS:
+1. Always be smart, thoughtful, and directly answer the exact question asked without generic repetitive filler.
+2. If the user asks a random, creative, scientific, or general question, answer it intelligently, fluently, and warmly.
+3. When relevant to the user's inquiry, naturally weave in and reference the exact live metrics (${city}, temperature, humidity, rain chance, etc.).
+4. Use clean, elegant GitHub markdown formatting with **bold highlights** and bullet points when listing recommendations.`;
+
+  const messages: any[] = [
+    { role: "system", content: systemPrompt },
+  ];
+
+  if (Array.isArray(history) && history.length > 0) {
+    for (const h of history.slice(-6)) {
+      const msgRole = (h.role === "user" || h.sender === "user") ? "user" : "assistant";
+      const text = h.text || h.content || "";
+      if (text && typeof text === "string") {
+        messages.push({ role: msgRole, content: text.slice(0, 500) });
+      }
+    }
+  }
+
+  messages.push({ role: "user", content: userQuery });
+
+  // 1. Primary: Groq High-Speed Llama Models (Llama 3.3 70B & Llama 3.1 8B Instant)
+  if (groqKey && !groqKey.startsWith("your-")) {
+    const groqModels = ["llama-3.3-70b-versatile", "llama-3.1-8b-instant", "llama3-70b-8192"];
+    for (const model of groqModels) {
+      try {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 4000);
+        const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${groqKey}`,
+          },
+          signal: controller.signal,
+          body: JSON.stringify({
+            model,
+            messages,
+            temperature: 0.6,
+            max_tokens: 800,
+          }),
+        });
+        clearTimeout(timeout);
+        if (res.ok) {
+          const data = await res.json();
+          const reply = data.choices?.[0]?.message?.content?.trim();
+          if (reply) {
+            console.log(`[WeatherGPT] Answered via Groq (${model})`);
+            return reply;
+          }
+        }
+      } catch (err) {
+        console.warn(`[WeatherGPT] Groq (${model}) attempt failed:`, err);
+      }
+    }
+  }
+
+  // 2. Secondary: Google Gemini Models (Gemini 2.0 Flash & Gemini 1.5 Flash)
+  if (geminiKey && !geminiKey.startsWith("your-")) {
+    const geminiModels = ["gemini-2.0-flash", "gemini-1.5-flash"];
+    for (const model of geminiModels) {
+      try {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 4000);
+        const res = await fetch("https://generativelanguage.googleapis.com/v1beta/openai/chat/completions", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${geminiKey}`,
+          },
+          signal: controller.signal,
+          body: JSON.stringify({
+            model,
+            messages,
+            temperature: 0.6,
+            max_tokens: 800,
+          }),
+        });
+        clearTimeout(timeout);
+        if (res.ok) {
+          const data = await res.json();
+          const reply = data.choices?.[0]?.message?.content?.trim();
+          if (reply) {
+            console.log(`[WeatherGPT] Answered via Gemini (${model})`);
+            return reply;
+          }
+        }
+      } catch (err) {
+        console.warn(`[WeatherGPT] Gemini (${model}) attempt failed:`, err);
+      }
+    }
+  }
+
+  return null;
+}
+
 export async function POST(request: Request) {
   try {
     const {
@@ -440,7 +563,7 @@ export async function POST(request: Request) {
       resolvedLng = 77.3890;
     }
 
-    // Fetch 100% Dynamic Live Weather Data and Backend AI response concurrently with fast 2.5s timeout
+    // Fetch 100% Dynamic Live Weather Data and Backend AI response concurrently with 3.5s timeout
     const backendEndpoints = [
       process.env.INTERNAL_API_URL || "http://backend:8000/api/v1",
       process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000/api/v1",
@@ -451,7 +574,7 @@ export async function POST(request: Request) {
       for (const base of backendEndpoints) {
         try {
           const controller = new AbortController();
-          const timer = setTimeout(() => controller.abort(), 2800);
+          const timer = setTimeout(() => controller.abort(), 3500);
           const backendRes = await fetch(`${base}/ask`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -550,13 +673,47 @@ export async function POST(request: Request) {
     const now = new Date();
     const updatedAt = `${String(now.getHours() % 12 || 12).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")} ${now.getHours() >= 12 ? "PM" : "AM"}`;
 
-    console.log("[WeatherGPT] backendData?.response present:", !!backendData?.response, "length:", backendData?.response?.length ?? 0);
-    
-    const narrativeResponse =
-      (backendData?.response && !backendData.response.includes("Upcoming 7-Day Forecast Outlook")
-        ? backendData.response
-        : "") ||
-      generateIntelligentConversationalResponse(
+    // Build rich real-time context for LLM
+    const weatherContext = `- Location: ${extractedCity} (Lat: ${resolvedLat}, Lng: ${resolvedLng})
+- Condition: ${mapWeatherCodeToDescription(weatherCode)}
+- Current Temperature: ${resolvedTemp}°C (Feels like: ${feelsLike}°C)
+- Today's Temperature Range: High ${maxTemp}°C / Low ${minTemp}°C
+- Relative Humidity: ${humidity}%
+- Surface Wind: ${windSpeed} km/h
+- Atmospheric Pressure: ${pressure} hPa
+- Rain Probability (24h): ${rainChance}%
+- Air Quality (CPCB NAQI Standard): AQI ${astroEnv?.aqi ?? 105} (${astroEnv?.aqiCategory ?? "Moderate"})
+- Solar & UV Index: ${astroEnv?.uvIndex ?? 5.4} (Sunrise: ${astroEnv?.sunrise ?? "05:58"} IST, Sunset: ${astroEnv?.sunset ?? "18:43"} IST)
+- Moon Ephemeris: ${astroEnv?.moonPhase ?? "Waxing Crescent"} (Moonrise: ${astroEnv?.moonrise ?? "21:00"}, Moonset: ${astroEnv?.moonset ?? "09:49"})
+- Active IMD Warning: ${astroEnv?.imdWarning || "None (Green)"}
+- 3-Hourly Telemetry Nowcast: ${(livePinpoint.nowcastSlots || []).slice(0, 3).map((s: any) => `${s.time}: ${s.temp}°C (${s.condition}, ${s.rainChance}% rain)`).join(" | ")}
+- Next 3-Day Forecast: ${formattedForecast.slice(1, 4).map((f: any) => `${f.day}: ${f.highTemp}°C/${f.lowTemp}°C, ${f.rainChance}% rain (${f.condition})`).join(" | ")}`;
+
+    // LLM Response Priority:
+    // 1. Backend AI Response (if complete and not generic dump)
+    // 2. Direct Ultra-Fast Groq (Llama 3.3 70B / Llama 3.1 8B) or Gemini (2.0 Flash / 1.5 Flash)
+    // 3. Intelligent Conversational Engine Fallback
+    let narrativeResponse = "";
+    if (backendData?.response && !backendData.response.includes("Upcoming 7-Day Forecast Outlook") && backendData.response.length > 20) {
+      narrativeResponse = backendData.response;
+    }
+
+    if (!narrativeResponse) {
+      const directLLMResponse = await callDirectLLM(
+        message,
+        extractedCity,
+        weatherContext,
+        role,
+        language || "en",
+        history || []
+      );
+      if (directLLMResponse) {
+        narrativeResponse = directLLMResponse;
+      }
+    }
+
+    if (!narrativeResponse) {
+      narrativeResponse = generateIntelligentConversationalResponse(
         message,
         extractedCity,
         resolvedTemp,
@@ -574,6 +731,7 @@ export async function POST(request: Request) {
         role,
         language
       );
+    }
 
     return NextResponse.json({
       city: extractedCity,
