@@ -1,5 +1,16 @@
 import { NextResponse } from "next/server";
 
+export function stripInternalThinking(text: string): string {
+  if (!text) return "";
+  return text
+    .replace(/<think>[\s\S]*?<\/think>/gi, "")
+    .replace(/<think>[\s\S]*$/gi, "")
+    .replace(/\[think(?:ing)?\][\s\S]*?\[\/think(?:ing)?\]/gi, "")
+    .replace(/\[think(?:ing)?\][\s\S]*$/gi, "")
+    .replace(/^Thinking Process:[\s\S]*?(?=\n\n|\n[#A-Z])/gi, "")
+    .trim();
+}
+
 function mapWeatherCodeToType(code: number): "clear" | "cloudy" | "rainy" {
   if ([0, 1].includes(code)) return "clear";
   if ([2, 3, 45, 48].includes(code)) return "cloudy";
@@ -480,7 +491,8 @@ CORE INSTRUCTIONS:
         clearTimeout(timeout);
         if (res.ok) {
           const data = await res.json();
-          const reply = data.choices?.[0]?.message?.content?.trim();
+          const rawReply = data.choices?.[0]?.message?.content;
+          const reply = stripInternalThinking(rawReply || "");
           if (reply) {
             console.log(`[WeatherGPT] Answered via Groq (${model})`);
             return reply;
@@ -516,7 +528,8 @@ CORE INSTRUCTIONS:
         clearTimeout(timeout);
         if (res.ok) {
           const data = await res.json();
-          const reply = data.choices?.[0]?.message?.content?.trim();
+          const rawReply = data.choices?.[0]?.message?.content;
+          const reply = stripInternalThinking(rawReply || "");
           if (reply) {
             console.log(`[WeatherGPT] Answered via Gemini (${model})`);
             return reply;
@@ -760,7 +773,7 @@ export async function POST(request: Request) {
       lng: resolvedLng,
       updatedAt,
       nowcastSlots: livePinpoint.nowcastSlots || [],
-      response: narrativeResponse,
+      response: stripInternalThinking(narrativeResponse || ""),
       forecast: formattedForecast,
       ...astroEnv,
     });

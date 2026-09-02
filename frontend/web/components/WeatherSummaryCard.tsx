@@ -255,6 +255,7 @@ export default function WeatherSummaryCard({
           <button
             onClick={onOpenLightning}
             title={t.lightningAnalyzer}
+            aria-label="Open DAMINI lightning strike analyzer"
             className="p-1.5 rounded-xl bg-gray-950/80 hover:bg-yellow-400/20 border border-white/10 hover:border-yellow-400/40 text-yellow-400 flex flex-col items-center gap-0.5 transition cursor-pointer"
           >
             <Zap className="w-3.5 h-3.5" />
@@ -264,6 +265,7 @@ export default function WeatherSummaryCard({
           <button
             onClick={onOpenCropGDD}
             title={t.cropGdd}
+            aria-label="Open crop calendar and GDD engine"
             className="p-1.5 rounded-xl bg-gray-950/80 hover:bg-yellow-400/20 border border-white/10 hover:border-yellow-400/40 text-emerald-400 flex flex-col items-center gap-0.5 transition cursor-pointer"
           >
             <Sprout className="w-3.5 h-3.5" />
@@ -273,6 +275,7 @@ export default function WeatherSummaryCard({
           <button
             onClick={onOpenSatellite}
             title={t.satelliteInsat}
+            aria-label="Open ISRO INSAT satellite feed"
             className="p-1.5 rounded-xl bg-gray-950/80 hover:bg-yellow-400/20 border border-white/10 hover:border-yellow-400/40 text-cyan-400 flex flex-col items-center gap-0.5 transition cursor-pointer"
           >
             <Satellite className="w-3.5 h-3.5" />
@@ -282,6 +285,7 @@ export default function WeatherSummaryCard({
           <button
             onClick={onOpenDisaster}
             title={t.disasterHub}
+            aria-label="Open NDMA disaster relief hub"
             className="p-1.5 rounded-xl bg-gray-950/80 hover:bg-yellow-400/20 border border-white/10 hover:border-yellow-400/40 text-red-400 flex flex-col items-center gap-0.5 transition cursor-pointer"
           >
             <ShieldAlert className="w-3.5 h-3.5" />
@@ -291,6 +295,7 @@ export default function WeatherSummaryCard({
           <button
             onClick={onOpenSms}
             title={t.ruralSms}
+            aria-label="Open rural SMS broadcast simulator"
             className="p-1.5 rounded-xl bg-gray-950/80 hover:bg-yellow-400/20 border border-white/10 hover:border-yellow-400/40 text-yellow-300 flex flex-col items-center gap-0.5 transition cursor-pointer"
           >
             <Smartphone className="w-3.5 h-3.5" />

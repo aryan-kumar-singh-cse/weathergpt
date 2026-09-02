@@ -37,6 +37,7 @@ function PhotorealisticEarth({ lat, lng, weatherCondition, onSelectLocation }: P
   const prevPointerRef = useRef({ x: 0, y: 0 });
   const flyToTimeRemainingRef = useRef(0);
   const prevCoordsRef = useRef({ lat, lng });
+  const elapsedTimeRef = useRef(0);
 
   // Load NASA Blue Marble textures
   const [dayMap, nightMap, cloudsMap] = useTexture([
@@ -108,7 +109,8 @@ function PhotorealisticEarth({ lat, lng, weatherCondition, onSelectLocation }: P
     }
 
     // Concentric Radar Ripple Wave Animations (tangent on surface)
-    const elapsed = state.clock.getElapsedTime();
+    elapsedTimeRef.current += delta;
+    const elapsed = elapsedTimeRef.current;
     if (rippleRing1Ref.current) {
       const phase1 = (elapsed * 2.0) % 1;
       const scale1 = 0.6 + phase1 * 0.8;
