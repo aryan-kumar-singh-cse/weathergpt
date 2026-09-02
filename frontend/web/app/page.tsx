@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import dynamic from "next/dynamic";
 import Header from "@/components/Header";
 import WeatherSummaryCard from "@/components/WeatherSummaryCard";
