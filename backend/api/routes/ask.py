@@ -78,8 +78,8 @@ async def _fetch_historical_data(
             "data_source": trend_data["data_source"]
         }
 
-    elif any(kw in query_lower for kw in ["compare", "vs", "versus", "normal", "average", "typical"]):
-        # Current vs historical comparison
+    elif any(kw in query_lower for kw in ["normal", "30-year", "30 year", "historical average", "climate average", "typical for this month", "climate baseline"]):
+        # Current vs historical climate normal comparison
         metric = "precipitation" if any(kw in query_lower for kw in ["rain", "rainfall", "precipitation"]) else "temperature"
         comparison_data = await climate_service.compare_current_to_historical(lat, lng, metric=metric)
         return {
