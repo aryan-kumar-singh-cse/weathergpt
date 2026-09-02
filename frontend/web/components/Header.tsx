@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import SettingsPanel, { Preferences } from "./SettingsPanel";
 import LocationSearchBar from "./LocationSearchBar";
 import {
