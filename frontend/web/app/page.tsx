@@ -301,7 +301,7 @@ export default function Home() {
             message,
             occupation: preferences.occupation,
             language: selectedLanguage,
-            location: dashboardWeather.city || "Sahibabad, Ghaziabad",
+            location: dashboardWeather.city || "Modinagar, Ghaziabad",
             lat: dashboardWeather.lat,
             lng: dashboardWeather.lng,
             history: formattedHistory,
