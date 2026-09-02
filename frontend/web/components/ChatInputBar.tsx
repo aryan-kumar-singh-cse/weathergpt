@@ -332,10 +332,13 @@ export default function ChatInputBar({
     setTimeout(() => setCopiedMessageId(null), 2000);
   };
 
+  const isSubmittingRef = useRef(false);
+
   const handleSubmit = async (textToSend?: string) => {
     const query = (textToSend || value).trim();
-    if (!query || isLoading) return;
+    if (!query || isLoading || isSubmittingRef.current) return;
 
+    isSubmittingRef.current = true;
     const userMsg: ChatMessage = {
       id: crypto.randomUUID(),
       sender: "user",
@@ -370,7 +373,9 @@ export default function ChatInputBar({
           ];
         });
       }
-    } catch {}
+    } catch {} finally {
+      isSubmittingRef.current = false;
+    }
   };
 
   const handleClearChat = (e: React.MouseEvent) => {
@@ -658,7 +663,7 @@ export default function ChatInputBar({
           onKeyDown={(e) => {
             if (e.key === "Enter" && !e.shiftKey) {
               e.preventDefault();
-              if (!isLoading && value.trim()) {
+              if (!isLoading && !isSubmittingRef.current && value.trim()) {
                 handleSubmit();
               }
             }
