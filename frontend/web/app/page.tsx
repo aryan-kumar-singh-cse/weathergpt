@@ -81,29 +81,29 @@ type DashboardWeather = {
 export default function Home() {
   // Main Dashboard Weather State with 0.1 Decimal Precision matching MAUSAM App
   const [dashboardWeather, setDashboardWeather] = useState<DashboardWeather>({
-    city: "",
-    temp: 30.0,
-    feelsLike: 32.0,
-    maxTemp: 34.0,
-    minTemp: 24.0,
-    humidity: 50,
+    city: "Modinagar, Ghaziabad",
+    temp: 29.3,
+    feelsLike: 36.2,
+    maxTemp: 31.7,
+    minTemp: 24.9,
+    humidity: 80,
     windSpeed: 8.0,
-    pressure: 1012,
-    condition: "Partly Cloudy",
-    rainChance: 15,
+    pressure: 1010,
+    condition: "Mainly Clear",
+    rainChance: 20,
     weatherType: "clear",
-    lat: 28.6780,
-    lng: 77.3890,
+    lat: 28.7695,
+    lng: 77.5750,
     uvIndex: 5.4,
-    aqi: 110,
-    aqiCategory: "Moderate",
-    sunrise: "05:58",
-    sunset: "18:43",
-    moonrise: "21:00",
-    moonset: "09:49",
+    aqi: 35,
+    aqiCategory: "Good",
+    sunrise: "06:01",
+    sunset: "18:41",
+    moonrise: "21:30",
+    moonset: "10:15",
     moonPhase: "Waxing Gibbous",
     visibility: 10,
-    dewPoint: 21.0,
+    dewPoint: 22.0,
     updatedAt: "Live",
     imdWarning: "",
     imdSeverity: "green",
@@ -111,7 +111,7 @@ export default function Home() {
     forecast: [],
   });
 
-  const [globeCoords, setGlobeCoords] = useState({ lat: 28.6780, lng: 77.3890 });
+  const [globeCoords, setGlobeCoords] = useState({ lat: 28.7695, lng: 77.5750 });
   const [detailedDays15, setDetailedDays15] = useState<DetailedDay[]>([]);
   const [isForecastOpen, setIsForecastOpen] = useState(false);
   const [isChatExpanded, setIsChatExpanded] = useState(false);
@@ -361,7 +361,7 @@ export default function Home() {
         try {
           const { latitude, longitude } = pos.coords;
           const geo = await reverseGeocode(latitude, longitude);
-          const detectedCity = geo.city || "Sahibabad, Ghaziabad";
+          const detectedCity = geo.city || "Modinagar, Ghaziabad";
 
           setPreferences((prev) => ({ ...prev, defaultLocation: detectedCity }));
           if (toastId) toast.success(`Located at ${detectedCity}`, { id: toastId });
@@ -377,7 +377,7 @@ export default function Home() {
         setIsLocating(false);
         if (isManual && toastId) toast.error("Location permission denied", { id: toastId });
         if (!isManual) {
-          handleSelectDashboardLocation("Sahibabad, Ghaziabad", { lat: 28.6780, lng: 77.3890 }, true);
+          handleSelectDashboardLocation("Modinagar, Ghaziabad", { lat: 28.7695, lng: 77.5750 }, true);
         }
       },
       { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }

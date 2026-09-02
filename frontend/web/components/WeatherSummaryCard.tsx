@@ -128,7 +128,7 @@ export default function WeatherSummaryCard({
         <div className="flex items-center gap-1.5 overflow-hidden">
           <MapPin className="w-4 h-4 text-yellow-400 shrink-0" />
           <p className="text-xs md:text-sm font-bold text-white tracking-wide truncate">
-            {city || "Sahibabad, Ghaziabad"}
+            {city || "Modinagar, Ghaziabad"}
           </p>
         </div>
 

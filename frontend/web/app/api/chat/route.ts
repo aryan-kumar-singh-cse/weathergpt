@@ -456,13 +456,13 @@ CORE INSTRUCTIONS:
 
   messages.push({ role: "user", content: userQuery });
 
-  // 1. Primary: Groq High-Speed Models (openai/gpt-oss-120b, openai/gpt-oss-20b, qwen/qwen3.6-27b)
+  // 1. Primary: Groq Ultra-Fast Models (openai/gpt-oss-20b, qwen/qwen3.6-27b for lightning-fast sub-second latency)
   if (groqKey && !groqKey.startsWith("your-")) {
-    const groqModels = ["openai/gpt-oss-120b", "openai/gpt-oss-20b", "qwen/qwen3.6-27b", "qwen/qwen3.8-27b", "groq/compound"];
+    const groqModels = ["openai/gpt-oss-20b", "qwen/qwen3.6-27b", "openai/gpt-oss-120b", "groq/compound"];
     for (const model of groqModels) {
       try {
         const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 4500);
+        const timeout = setTimeout(() => controller.abort(), 3000);
         const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
           method: "POST",
           headers: {
@@ -474,7 +474,7 @@ CORE INSTRUCTIONS:
             model,
             messages,
             temperature: 0.6,
-            max_tokens: 800,
+            max_tokens: 600,
           }),
         });
         clearTimeout(timeout);
@@ -492,13 +492,13 @@ CORE INSTRUCTIONS:
     }
   }
 
-  // 2. Secondary: Google Gemini Models (Gemini 3.6 Flash & Gemini 2.5 Flash)
+  // 2. Secondary: Google Gemini Fast Flash Models (gemini-2.5-flash)
   if (geminiKey && !geminiKey.startsWith("your-")) {
-    const geminiModels = ["gemini-3.6-flash", "gemini-2.5-flash", "gemini-flash-latest"];
+    const geminiModels = ["gemini-2.5-flash", "gemini-3.6-flash", "gemini-flash-latest"];
     for (const model of geminiModels) {
       try {
         const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 4500);
+        const timeout = setTimeout(() => controller.abort(), 3000);
         const res = await fetch("https://generativelanguage.googleapis.com/v1beta/openai/chat/completions", {
           method: "POST",
           headers: {
@@ -510,7 +510,7 @@ CORE INSTRUCTIONS:
             model,
             messages,
             temperature: 0.6,
-            max_tokens: 800,
+            max_tokens: 600,
           }),
         });
         clearTimeout(timeout);
