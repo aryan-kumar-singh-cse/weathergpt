@@ -373,14 +373,55 @@ function extractMentionedDistricts(query: string, currentCity: string): string[]
   }
 
   const knownPlaces = [
-    "modinagar", "modīnagar", "baghpat", "bagpat", "meerut", "ghaziabad", "delhi", "new delhi",
-    "noida", "greater noida", "hapur", "muzaffarnagar", "shamli", "bulandshahr", "aligarh",
-    "mathura", "agra", "gurugram", "gurgaon", "faridabad", "sonipat", "panipat",
-    "karnal", "rohtak", "chandigarh", "dehradun", "haridwar", "rishikesh", "shimla",
-    "jaipur", "lucknow", "kanpur", "varanasi", "prayagraj", "ayodhya", "patna",
-    "mumbai", "pune", "nagpur", "ahmedabad", "surat", "bengaluru", "bangalore", "chennai",
-    "hyderabad", "kolkata", "london", "paris", "tokyo", "new york", "dubai", "singapore",
-    "sydney", "berlin", "moscow", "rome", "bangkok", "cairo", "san francisco", "toronto"
+    // World & Global Hubs
+    "tokyo", "paris", "london", "new york", "sydney", "melbourne", "singapore", "dubai", "berlin", "moscow", "rome",
+    "bangkok", "los angeles", "chicago", "san francisco", "toronto", "vancouver", "seoul", "beijing", "shanghai",
+    "cairo", "nairobi", "abu dhabi", "doha", "riyadh", "munich", "frankfurt", "milan", "madrid", "barcelona",
+
+    // Himachal Pradesh & Himalayas
+    "shimla", "manali", "dharamshala", "kullu", "mandi", "solan", "kangra", "bilaspur", "chamba", "una", "hamirpur", "keylong", "lahaul", "spiti",
+
+    // Bihar
+    "patna", "gaya", "bhagalpur", "muzaffarpur", "darbhanga", "purnia", "begusarai", "nalanda", "ara", "munger", "chhapra", "katihar", "motihari", "saharsa", "samastipur",
+
+    // Uttarakhand
+    "dehradun", "haridwar", "rishikesh", "nainital", "mussoorie", "haldwani", "almora", "rudraprayag", "chamoli", "uttarkashi", "pithoragarh", "badrinath", "kedarnath",
+
+    // Jammu & Kashmir & Ladakh
+    "srinagar", "jammu", "gulmarg", "pahalgam", "leh", "kargil", "anantnag", "baramulla", "udhampur",
+
+    // Delhi NCR & Uttar Pradesh
+    "delhi", "new delhi", "noida", "greater noida", "ghaziabad", "modinagar", "baghpat", "bagpat", "hapur", "meerut",
+    "lucknow", "kanpur", "varanasi", "prayagraj", "allahabad", "agra", "ayodhya", "gorakhpur", "bareilly", "aligarh",
+    "moradabad", "saharanpur", "muzaffarnagar", "jhansi", "mathura", "vrindavan", "firozabad", "bulandshahr", "shamli",
+
+    // Punjab & Haryana & Chandigarh
+    "chandigarh", "amritsar", "ludhiana", "jalandhar", "patiala", "bathinda", "mohali", "panipat", "karnal", "rohtak", "hisar", "ambala", "gurugram", "gurgaon", "faridabad", "sonipat",
+
+    // Rajasthan
+    "jaipur", "jodhpur", "udaipur", "kota", "bikaner", "ajmer", "jaisalmer", "alwar", "bharatpur", "sikar", "bhilwara", "mount abu",
+
+    // Gujarat
+    "ahmedabad", "surat", "vadodara", "rajkot", "gandhinagar", "bhavnagar", "bhuj", "junagadh", "jamnagar", "kutch",
+
+    // Madhya Pradesh & Chhattisgarh
+    "bhopal", "indore", "jabalpur", "gwalior", "ujjain", "raipur", "durg", "bhilai", "bilaspur", "sagar",
+
+    // West Bengal, Odisha & Jharkhand
+    "kolkata", "calcutta", "howrah", "siliguri", "darjeeling", "durgapur", "asansol", "bhubaneswar", "cuttack", "puri", "rourkela", "sambalpur", "ranchi", "jamshedpur", "dhanbad", "bokaro", "deoghar",
+
+    // North-East States
+    "guwahati", "dibrugarh", "silchar", "shillong", "imphal", "agartala", "aizawl", "kohima", "gangtok", "itanagar", "jorhat", "tezpur",
+
+    // Maharashtra & Goa
+    "mumbai", "bombay", "pune", "nagpur", "nashik", "thane", "navi mumbai", "chhatrapati sambhajinagar", "aurangabad", "solapur", "kolhapur", "panaji", "goa", "margao",
+
+    // Karnataka, Telangana, Andhra Pradesh
+    "bengaluru", "bangalore", "mysuru", "mysore", "mangaluru", "mangalore", "hubli", "belgaum", "hyderabad", "secunderabad", "warangal", "nizamabad", "visakhapatnam", "vizag", "vijayawada", "guntur", "tirupati", "nellore", "kurnool",
+
+    // Tamil Nadu & Kerala
+    "chennai", "madras", "coimbatore", "madurai", "tiruchirappalli", "trichy", "salem", "tirunelveli", "vellore", "ooty", "kodaikanal",
+    "thiruvananthapuram", "trivandrum", "kochi", "cochin", "ernakulam", "kozhikode", "calicut", "thrissur", "wayanad", "palakkad", "kollam", "alappuzha", "alleppey", "kannur", "kottayam", "idukki", "munnar", "kasaragod"
   ];
 
   for (const place of knownPlaces) {
@@ -431,13 +472,55 @@ function extractTargetCityIfSpecified(query: string): string | null {
 
   // 1. Direct match for known world and Indian cities first
   const commonPlaces = [
-    "tokyo", "paris", "london", "new york", "sydney", "singapore", "dubai", "berlin", "moscow", "rome",
-    "bangkok", "los angeles", "chicago", "toronto", "vancouver", "seoul", "beijing", "shanghai",
-    "delhi", "new delhi", "mumbai", "bengaluru", "bangalore", "kolkata", "chennai", "hyderabad",
-    "pune", "ahmedabad", "jaipur", "lucknow", "kanpur", "varanasi", "agra", "dehradun", "shimla",
-    "chandigarh", "haridwar", "rishikesh", "goa", "patna", "bhopal", "indore", "surat", "nagpur",
-    "meerut", "ghaziabad", "modinagar", "baghpat", "bagpat", "noida", "greater noida", "hapur",
-    "muzaffarnagar", "shamli", "bulandshahr", "aligarh", "mathura", "gurugram", "gurgaon", "faridabad"
+    // World & Global Hubs
+    "tokyo", "paris", "london", "new york", "sydney", "melbourne", "singapore", "dubai", "berlin", "moscow", "rome",
+    "bangkok", "los angeles", "chicago", "san francisco", "toronto", "vancouver", "seoul", "beijing", "shanghai",
+    "cairo", "nairobi", "abu dhabi", "doha", "riyadh", "munich", "frankfurt", "milan", "madrid", "barcelona",
+
+    // Himachal Pradesh & Himalayas
+    "shimla", "manali", "dharamshala", "kullu", "mandi", "solan", "kangra", "bilaspur", "chamba", "una", "hamirpur", "keylong", "lahaul", "spiti",
+
+    // Bihar
+    "patna", "gaya", "bhagalpur", "muzaffarpur", "darbhanga", "purnia", "begusarai", "nalanda", "ara", "munger", "chhapra", "katihar", "motihari", "saharsa", "samastipur",
+
+    // Uttarakhand
+    "dehradun", "haridwar", "rishikesh", "nainital", "mussoorie", "haldwani", "almora", "rudraprayag", "chamoli", "uttarkashi", "pithoragarh", "badrinath", "kedarnath",
+
+    // Jammu & Kashmir & Ladakh
+    "srinagar", "jammu", "gulmarg", "pahalgam", "leh", "kargil", "anantnag", "baramulla", "udhampur",
+
+    // Delhi NCR & Uttar Pradesh
+    "delhi", "new delhi", "noida", "greater noida", "ghaziabad", "modinagar", "baghpat", "bagpat", "hapur", "meerut",
+    "lucknow", "kanpur", "varanasi", "prayagraj", "allahabad", "agra", "ayodhya", "gorakhpur", "bareilly", "aligarh",
+    "moradabad", "saharanpur", "muzaffarnagar", "jhansi", "mathura", "vrindavan", "firozabad", "bulandshahr", "shamli",
+
+    // Punjab & Haryana & Chandigarh
+    "chandigarh", "amritsar", "ludhiana", "jalandhar", "patiala", "bathinda", "mohali", "panipat", "karnal", "rohtak", "hisar", "ambala", "gurugram", "gurgaon", "faridabad", "sonipat",
+
+    // Rajasthan
+    "jaipur", "jodhpur", "udaipur", "kota", "bikaner", "ajmer", "jaisalmer", "alwar", "bharatpur", "sikar", "bhilwara", "mount abu",
+
+    // Gujarat
+    "ahmedabad", "surat", "vadodara", "rajkot", "gandhinagar", "bhavnagar", "bhuj", "junagadh", "jamnagar", "kutch",
+
+    // Madhya Pradesh & Chhattisgarh
+    "bhopal", "indore", "jabalpur", "gwalior", "ujjain", "raipur", "durg", "bhilai", "bilaspur", "sagar",
+
+    // West Bengal, Odisha & Jharkhand
+    "kolkata", "calcutta", "howrah", "siliguri", "darjeeling", "durgapur", "asansol", "bhubaneswar", "cuttack", "puri", "rourkela", "sambalpur", "ranchi", "jamshedpur", "dhanbad", "bokaro", "deoghar",
+
+    // North-East States
+    "guwahati", "dibrugarh", "silchar", "shillong", "imphal", "agartala", "aizawl", "kohima", "gangtok", "itanagar", "jorhat", "tezpur",
+
+    // Maharashtra & Goa
+    "mumbai", "bombay", "pune", "nagpur", "nashik", "thane", "navi mumbai", "chhatrapati sambhajinagar", "aurangabad", "solapur", "kolhapur", "panaji", "goa", "margao",
+
+    // Karnataka, Telangana, Andhra Pradesh
+    "bengaluru", "bangalore", "mysuru", "mysore", "mangaluru", "mangalore", "hubli", "belgaum", "hyderabad", "secunderabad", "warangal", "nizamabad", "visakhapatnam", "vizag", "vijayawada", "guntur", "tirupati", "nellore", "kurnool",
+
+    // Tamil Nadu & Kerala
+    "chennai", "madras", "coimbatore", "madurai", "tiruchirappalli", "trichy", "salem", "tirunelveli", "vellore", "ooty", "kodaikanal",
+    "thiruvananthapuram", "trivandrum", "kochi", "cochin", "ernakulam", "kozhikode", "calicut", "thrissur", "wayanad", "palakkad", "kollam", "alappuzha", "alleppey", "kannur", "kottayam", "idukki", "munnar", "kasaragod"
   ];
 
   for (const place of commonPlaces) {
@@ -823,6 +906,7 @@ CORE INSTRUCTIONS:
 }
 
 const KNOWN_EXACT_PLACES: Record<string, { name: string; lat: number; lng: number }> = {
+  // Delhi NCR & UP
   modinagar: { name: "Modinagar, Uttar Pradesh", lat: 28.7695, lng: 77.5750 },
   "modīnagar": { name: "Modinagar, Uttar Pradesh", lat: 28.7695, lng: 77.5750 },
   baghpat: { name: "Baghpat, Uttar Pradesh", lat: 28.9447, lng: 77.2244 },
@@ -834,16 +918,268 @@ const KNOWN_EXACT_PLACES: Record<string, { name: string; lat: number; lng: numbe
   hapur: { name: "Hapur, Uttar Pradesh", lat: 28.7306, lng: 77.7759 },
   delhi: { name: "New Delhi, Delhi", lat: 28.6139, lng: 77.2090 },
   "new delhi": { name: "New Delhi, Delhi", lat: 28.6139, lng: 77.2090 },
+  lucknow: { name: "Lucknow, Uttar Pradesh", lat: 26.8467, lng: 80.9462 },
+  kanpur: { name: "Kanpur, Uttar Pradesh", lat: 26.4499, lng: 80.3319 },
+  varanasi: { name: "Varanasi, Uttar Pradesh", lat: 25.3176, lng: 82.9739 },
+  prayagraj: { name: "Prayagraj, Uttar Pradesh", lat: 25.4358, lng: 81.8463 },
+  allahabad: { name: "Prayagraj, Uttar Pradesh", lat: 25.4358, lng: 81.8463 },
+  agra: { name: "Agra, Uttar Pradesh", lat: 27.1767, lng: 78.0081 },
+  ayodhya: { name: "Ayodhya, Uttar Pradesh", lat: 26.7922, lng: 82.1998 },
+  gorakhpur: { name: "Gorakhpur, Uttar Pradesh", lat: 26.7606, lng: 83.3732 },
+  bareilly: { name: "Bareilly, Uttar Pradesh", lat: 28.3670, lng: 79.4304 },
+  aligarh: { name: "Aligarh, Uttar Pradesh", lat: 27.8974, lng: 78.0880 },
+  moradabad: { name: "Moradabad, Uttar Pradesh", lat: 28.8386, lng: 78.7733 },
+  saharanpur: { name: "Saharanpur, Uttar Pradesh", lat: 29.9640, lng: 77.5460 },
+  muzaffarnagar: { name: "Muzaffarnagar, Uttar Pradesh", lat: 29.4727, lng: 77.7085 },
+  jhansi: { name: "Jhansi, Uttar Pradesh", lat: 25.4484, lng: 78.5685 },
+  mathura: { name: "Mathura, Uttar Pradesh", lat: 27.4924, lng: 77.6737 },
+
+  // Himachal Pradesh (Himalayas)
+  shimla: { name: "Shimla, Himachal Pradesh", lat: 31.1048, lng: 77.1734 },
+  manali: { name: "Manali, Himachal Pradesh", lat: 32.2432, lng: 77.1892 },
+  dharamshala: { name: "Dharamshala, Himachal Pradesh", lat: 32.2190, lng: 76.3234 },
+  kullu: { name: "Kullu, Himachal Pradesh", lat: 31.9579, lng: 77.1095 },
+  mandi: { name: "Mandi, Himachal Pradesh", lat: 31.7087, lng: 76.9320 },
+  solan: { name: "Solan, Himachal Pradesh", lat: 30.9084, lng: 77.0999 },
+  kangra: { name: "Kangra, Himachal Pradesh", lat: 32.0998, lng: 76.2691 },
+  bilaspur: { name: "Bilaspur, Himachal Pradesh", lat: 31.3414, lng: 76.7610 },
+  chamba: { name: "Chamba, Himachal Pradesh", lat: 32.5534, lng: 76.1258 },
+  una: { name: "Una, Himachal Pradesh", lat: 31.4685, lng: 76.2708 },
+  hamirpur: { name: "Hamirpur, Himachal Pradesh", lat: 31.6862, lng: 76.5213 },
+  keylong: { name: "Keylong, Lahaul & Spiti, Himachal Pradesh", lat: 32.5710, lng: 77.0320 },
+  lahaul: { name: "Lahaul and Spiti, Himachal Pradesh", lat: 32.5710, lng: 77.0320 },
+  spiti: { name: "Spiti Valley, Himachal Pradesh", lat: 32.2461, lng: 78.0349 },
+
+  // Bihar
+  patna: { name: "Patna, Bihar", lat: 25.5941, lng: 85.1376 },
+  gaya: { name: "Gaya, Bihar", lat: 24.7914, lng: 85.0002 },
+  bhagalpur: { name: "Bhagalpur, Bihar", lat: 25.2425, lng: 86.9842 },
+  muzaffarpur: { name: "Muzaffarpur, Bihar", lat: 26.1209, lng: 85.3647 },
+  darbhanga: { name: "Darbhanga, Bihar", lat: 26.1542, lng: 85.8918 },
+  purnia: { name: "Purnia, Bihar", lat: 25.7771, lng: 87.4753 },
+  begusarai: { name: "Begusarai, Bihar", lat: 25.4182, lng: 86.1272 },
+  nalanda: { name: "Nalanda, Bihar", lat: 25.1357, lng: 85.4632 },
+  ara: { name: "Ara, Bihar", lat: 25.5560, lng: 84.6603 },
+  munger: { name: "Munger, Bihar", lat: 25.3757, lng: 86.4744 },
+  chhapra: { name: "Chhapra, Bihar", lat: 25.7811, lng: 84.7543 },
+  katihar: { name: "Katihar, Bihar", lat: 25.5541, lng: 87.5716 },
+  motihari: { name: "Motihari, Bihar", lat: 26.6469, lng: 84.9089 },
+  saharsa: { name: "Saharsa, Bihar", lat: 25.8835, lng: 86.6006 },
+  samastipur: { name: "Samastipur, Bihar", lat: 25.8629, lng: 85.7811 },
+
+  // Uttarakhand
+  dehradun: { name: "Dehradun, Uttarakhand", lat: 30.3165, lng: 78.0322 },
+  haridwar: { name: "Haridwar, Uttarakhand", lat: 29.9457, lng: 78.1642 },
+  rishikesh: { name: "Rishikesh, Uttarakhand", lat: 30.0869, lng: 78.2676 },
+  nainital: { name: "Nainital, Uttarakhand", lat: 29.3919, lng: 79.4542 },
+  mussoorie: { name: "Mussoorie, Uttarakhand", lat: 30.4598, lng: 78.0644 },
+  haldwani: { name: "Haldwani, Uttarakhand", lat: 29.2183, lng: 79.5130 },
+  almora: { name: "Almora, Uttarakhand", lat: 29.5971, lng: 79.6591 },
+  rudraprayag: { name: "Rudraprayag, Uttarakhand", lat: 30.2844, lng: 78.9811 },
+  chamoli: { name: "Chamoli, Uttarakhand", lat: 30.4074, lng: 79.3248 },
+  uttarkashi: { name: "Uttarkashi, Uttarakhand", lat: 30.7268, lng: 78.4354 },
+  pithoragarh: { name: "Pithoragarh, Uttarakhand", lat: 29.5829, lng: 80.2182 },
+
+  // Jammu & Kashmir & Ladakh
+  srinagar: { name: "Srinagar, Jammu and Kashmir", lat: 34.0837, lng: 74.7973 },
+  jammu: { name: "Jammu, Jammu and Kashmir", lat: 32.7266, lng: 74.8570 },
+  gulmarg: { name: "Gulmarg, Jammu and Kashmir", lat: 34.0484, lng: 74.3805 },
+  pahalgam: { name: "Pahalgam, Jammu and Kashmir", lat: 34.0163, lng: 75.3150 },
+  leh: { name: "Leh, Ladakh", lat: 34.1526, lng: 77.5771 },
+  kargil: { name: "Kargil, Ladakh", lat: 34.5539, lng: 76.1349 },
+  anantnag: { name: "Anantnag, Jammu and Kashmir", lat: 33.7311, lng: 75.1487 },
+  baramulla: { name: "Baramulla, Jammu and Kashmir", lat: 34.2045, lng: 74.3436 },
+
+  // Punjab, Haryana & Chandigarh
+  chandigarh: { name: "Chandigarh, Chandigarh", lat: 30.7333, lng: 76.7794 },
+  amritsar: { name: "Amritsar, Punjab", lat: 31.6340, lng: 74.8723 },
+  ludhiana: { name: "Ludhiana, Punjab", lat: 30.9010, lng: 75.8573 },
+  jalandhar: { name: "Jalandhar, Punjab", lat: 31.3260, lng: 75.5762 },
+  patiala: { name: "Patiala, Punjab", lat: 30.3398, lng: 76.3869 },
+  bathinda: { name: "Bathinda, Punjab", lat: 30.2110, lng: 74.9455 },
+  mohali: { name: "Mohali, Punjab", lat: 30.7046, lng: 76.7179 },
+  panipat: { name: "Panipat, Haryana", lat: 29.3909, lng: 76.9635 },
+  karnal: { name: "Karnal, Haryana", lat: 29.6857, lng: 76.9905 },
+  rohtak: { name: "Rohtak, Haryana", lat: 28.8955, lng: 76.6066 },
+  hisar: { name: "Hisar, Haryana", lat: 29.1492, lng: 75.7217 },
+  ambala: { name: "Ambala, Haryana", lat: 30.3782, lng: 76.7767 },
+  gurugram: { name: "Gurugram, Haryana", lat: 28.4595, lng: 77.0266 },
+  gurgaon: { name: "Gurugram, Haryana", lat: 28.4595, lng: 77.0266 },
+  faridabad: { name: "Faridabad, Haryana", lat: 28.4089, lng: 77.3178 },
+  sonipat: { name: "Sonipat, Haryana", lat: 28.9931, lng: 77.0151 },
+
+  // Rajasthan
+  jaipur: { name: "Jaipur, Rajasthan", lat: 26.9124, lng: 75.7873 },
+  jodhpur: { name: "Jodhpur, Rajasthan", lat: 26.2389, lng: 73.0243 },
+  udaipur: { name: "Udaipur, Rajasthan", lat: 24.5854, lng: 73.7125 },
+  kota: { name: "Kota, Rajasthan", lat: 25.2138, lng: 75.8648 },
+  bikaner: { name: "Bikaner, Rajasthan", lat: 28.0229, lng: 73.3119 },
+  ajmer: { name: "Ajmer, Rajasthan", lat: 26.4499, lng: 74.6399 },
+  jaisalmer: { name: "Jaisalmer, Rajasthan", lat: 26.9157, lng: 70.9083 },
+  alwar: { name: "Alwar, Rajasthan", lat: 27.5530, lng: 76.6346 },
+  bharatpur: { name: "Bharatpur, Rajasthan", lat: 27.2152, lng: 77.5030 },
+  sikar: { name: "Sikar, Rajasthan", lat: 27.6094, lng: 75.1398 },
+  bhilwara: { name: "Bhilwara, Rajasthan", lat: 25.3407, lng: 74.6313 },
+  "mount abu": { name: "Mount Abu, Rajasthan", lat: 24.5925, lng: 72.7156 },
+
+  // Gujarat
+  ahmedabad: { name: "Ahmedabad, Gujarat", lat: 23.0225, lng: 72.5714 },
+  surat: { name: "Surat, Gujarat", lat: 21.1702, lng: 72.8311 },
+  vadodara: { name: "Vadodara, Gujarat", lat: 22.3072, lng: 73.1812 },
+  rajkot: { name: "Rajkot, Gujarat", lat: 22.3039, lng: 70.8022 },
+  gandhinagar: { name: "Gandhinagar, Gujarat", lat: 23.2156, lng: 72.6369 },
+  bhavnagar: { name: "Bhavnagar, Gujarat", lat: 21.7645, lng: 72.1519 },
+  bhuj: { name: "Bhuj, Kutch, Gujarat", lat: 23.2420, lng: 69.6669 },
+  kutch: { name: "Kutch, Gujarat", lat: 23.2420, lng: 69.6669 },
+  junagadh: { name: "Junagadh, Gujarat", lat: 21.5222, lng: 70.4579 },
+  jamnagar: { name: "Jamnagar, Gujarat", lat: 22.4707, lng: 70.0577 },
+
+  // Madhya Pradesh & Chhattisgarh
+  bhopal: { name: "Bhopal, Madhya Pradesh", lat: 23.2599, lng: 77.4126 },
+  indore: { name: "Indore, Madhya Pradesh", lat: 22.7196, lng: 75.8577 },
+  jabalpur: { name: "Jabalpur, Madhya Pradesh", lat: 23.1815, lng: 79.9864 },
+  gwalior: { name: "Gwalior, Madhya Pradesh", lat: 26.2183, lng: 78.1828 },
+  ujjain: { name: "Ujjain, Madhya Pradesh", lat: 23.1765, lng: 75.7885 },
+  sagar: { name: "Sagar, Madhya Pradesh", lat: 23.8388, lng: 78.7378 },
+  raipur: { name: "Raipur, Chhattisgarh", lat: 21.2514, lng: 81.6296 },
+  durg: { name: "Durg, Chhattisgarh", lat: 21.1904, lng: 81.2849 },
+  bhilai: { name: "Bhilai, Chhattisgarh", lat: 21.1938, lng: 81.3509 },
+
+  // West Bengal, Odisha & Jharkhand
+  kolkata: { name: "Kolkata, West Bengal", lat: 22.5726, lng: 88.3639 },
+  calcutta: { name: "Kolkata, West Bengal", lat: 22.5726, lng: 88.3639 },
+  howrah: { name: "Howrah, West Bengal", lat: 22.5958, lng: 88.2636 },
+  siliguri: { name: "Siliguri, West Bengal", lat: 26.7271, lng: 88.3953 },
+  darjeeling: { name: "Darjeeling, West Bengal", lat: 27.0410, lng: 88.2663 },
+  durgapur: { name: "Durgapur, West Bengal", lat: 23.5204, lng: 87.3119 },
+  asansol: { name: "Asansol, West Bengal", lat: 23.6739, lng: 86.9524 },
+  bhubaneswar: { name: "Bhubaneswar, Odisha", lat: 20.2961, lng: 85.8245 },
+  cuttack: { name: "Cuttack, Odisha", lat: 20.4625, lng: 85.8828 },
+  puri: { name: "Puri, Odisha", lat: 19.8135, lng: 85.8312 },
+  rourkela: { name: "Rourkela, Odisha", lat: 22.2604, lng: 84.8536 },
+  sambalpur: { name: "Sambalpur, Odisha", lat: 21.4669, lng: 83.9812 },
+  ranchi: { name: "Ranchi, Jharkhand", lat: 23.3441, lng: 85.3096 },
+  jamshedpur: { name: "Jamshedpur, Jharkhand", lat: 22.8046, lng: 86.2029 },
+  dhanbad: { name: "Dhanbad, Jharkhand", lat: 23.7957, lng: 86.4304 },
+  bokaro: { name: "Bokaro, Jharkhand", lat: 23.6693, lng: 86.1511 },
+  deoghar: { name: "Deoghar, Jharkhand", lat: 24.4826, lng: 86.7001 },
+
+  // North-East States
+  guwahati: { name: "Guwahati, Assam", lat: 26.1445, lng: 91.7362 },
+  dibrugarh: { name: "Dibrugarh, Assam", lat: 27.4728, lng: 94.9120 },
+  silchar: { name: "Silchar, Assam", lat: 24.8333, lng: 92.7789 },
+  jorhat: { name: "Jorhat, Assam", lat: 26.7509, lng: 94.2037 },
+  tezpur: { name: "Tezpur, Assam", lat: 26.6528, lng: 92.7926 },
+  shillong: { name: "Shillong, Meghalaya", lat: 25.5788, lng: 91.8933 },
+  imphal: { name: "Imphal, Manipur", lat: 24.8170, lng: 93.9368 },
+  agartala: { name: "Agartala, Tripura", lat: 23.8315, lng: 91.2868 },
+  aizawl: { name: "Aizawl, Mizoram", lat: 23.7271, lng: 92.7176 },
+  kohima: { name: "Kohima, Nagaland", lat: 25.6751, lng: 94.1086 },
+  gangtok: { name: "Gangtok, Sikkim", lat: 27.3389, lng: 88.6065 },
+  itanagar: { name: "Itanagar, Arunachal Pradesh", lat: 27.0844, lng: 93.6053 },
+
+  // Maharashtra & Goa
   mumbai: { name: "Mumbai, Maharashtra", lat: 19.0760, lng: 72.8777 },
+  bombay: { name: "Mumbai, Maharashtra", lat: 19.0760, lng: 72.8777 },
+  pune: { name: "Pune, Maharashtra", lat: 18.5204, lng: 73.8567 },
+  nagpur: { name: "Nagpur, Maharashtra", lat: 21.1458, lng: 79.0882 },
+  nashik: { name: "Nashik, Maharashtra", lat: 19.9975, lng: 73.7898 },
+  thane: { name: "Thane, Maharashtra", lat: 19.2183, lng: 72.9781 },
+  "navi mumbai": { name: "Navi Mumbai, Maharashtra", lat: 19.0330, lng: 73.0297 },
+  "chhatrapati sambhajinagar": { name: "Chhatrapati Sambhajinagar, Maharashtra", lat: 19.8762, lng: 75.3433 },
+  aurangabad: { name: "Chhatrapati Sambhajinagar, Maharashtra", lat: 19.8762, lng: 75.3433 },
+  solapur: { name: "Solapur, Maharashtra", lat: 17.6599, lng: 75.9064 },
+  kolhapur: { name: "Kolhapur, Maharashtra", lat: 16.7050, lng: 74.2433 },
+  panaji: { name: "Panaji, Goa", lat: 15.4909, lng: 73.8278 },
+  goa: { name: "Panaji, Goa", lat: 15.4909, lng: 73.8278 },
+  margao: { name: "Margao, Goa", lat: 15.2832, lng: 73.9862 },
+
+  // Karnataka, Telangana & Andhra Pradesh
   bengaluru: { name: "Bengaluru, Karnataka", lat: 12.9716, lng: 77.5946 },
   bangalore: { name: "Bengaluru, Karnataka", lat: 12.9716, lng: 77.5946 },
-  chennai: { name: "Chennai, Tamil Nadu", lat: 13.0827, lng: 80.2707 },
-  kolkata: { name: "Kolkata, West Bengal", lat: 22.5726, lng: 88.3639 },
+  mysuru: { name: "Mysuru, Karnataka", lat: 12.2958, lng: 76.6394 },
+  mysore: { name: "Mysuru, Karnataka", lat: 12.2958, lng: 76.6394 },
+  mangaluru: { name: "Mangaluru, Karnataka", lat: 12.9141, lng: 74.8560 },
+  mangalore: { name: "Mangaluru, Karnataka", lat: 12.9141, lng: 74.8560 },
+  hubli: { name: "Hubli, Karnataka", lat: 15.3647, lng: 75.1240 },
+  belgaum: { name: "Belgaum, Karnataka", lat: 15.8497, lng: 74.4977 },
   hyderabad: { name: "Hyderabad, Telangana", lat: 17.3850, lng: 78.4867 },
-  pune: { name: "Pune, Maharashtra", lat: 18.5204, lng: 73.8567 },
-  jaipur: { name: "Jaipur, Rajasthan", lat: 26.9124, lng: 75.7873 },
-  lucknow: { name: "Lucknow, Uttar Pradesh", lat: 26.8467, lng: 80.9462 },
-  varanasi: { name: "Varanasi, Uttar Pradesh", lat: 25.3176, lng: 82.9739 },
+  secunderabad: { name: "Secunderabad, Telangana", lat: 17.4399, lng: 78.4983 },
+  warangal: { name: "Warangal, Telangana", lat: 17.9689, lng: 79.5941 },
+  nizamabad: { name: "Nizamabad, Telangana", lat: 18.6725, lng: 78.0941 },
+  visakhapatnam: { name: "Visakhapatnam, Andhra Pradesh", lat: 17.6868, lng: 83.2185 },
+  vizag: { name: "Visakhapatnam, Andhra Pradesh", lat: 17.6868, lng: 83.2185 },
+  vijayawada: { name: "Vijayawada, Andhra Pradesh", lat: 16.5062, lng: 80.6480 },
+  guntur: { name: "Guntur, Andhra Pradesh", lat: 16.3067, lng: 80.4365 },
+  tirupati: { name: "Tirupati, Andhra Pradesh", lat: 13.6288, lng: 79.4192 },
+  nellore: { name: "Nellore, Andhra Pradesh", lat: 14.4426, lng: 79.9865 },
+  kurnool: { name: "Kurnool, Andhra Pradesh", lat: 15.8281, lng: 78.0373 },
+
+  // Tamil Nadu & Kerala
+  chennai: { name: "Chennai, Tamil Nadu", lat: 13.0827, lng: 80.2707 },
+  madras: { name: "Chennai, Tamil Nadu", lat: 13.0827, lng: 80.2707 },
+  coimbatore: { name: "Coimbatore, Tamil Nadu", lat: 11.0168, lng: 76.9558 },
+  madurai: { name: "Madurai, Tamil Nadu", lat: 9.9252, lng: 78.1198 },
+  tiruchirappalli: { name: "Tiruchirappalli, Tamil Nadu", lat: 10.7905, lng: 78.7047 },
+  trichy: { name: "Tiruchirappalli, Tamil Nadu", lat: 10.7905, lng: 78.7047 },
+  salem: { name: "Salem, Tamil Nadu", lat: 11.6643, lng: 78.1460 },
+  tirunelveli: { name: "Tirunelveli, Tamil Nadu", lat: 8.7139, lng: 77.7567 },
+  vellore: { name: "Vellore, Tamil Nadu", lat: 12.9165, lng: 79.1325 },
+  ooty: { name: "Ooty, Nilgiris, Tamil Nadu", lat: 11.4102, lng: 76.6950 },
+  kodaikanal: { name: "Kodaikanal, Tamil Nadu", lat: 10.2381, lng: 77.4892 },
+  thiruvananthapuram: { name: "Thiruvananthapuram, Kerala", lat: 8.5241, lng: 76.9366 },
+  trivandrum: { name: "Thiruvananthapuram, Kerala", lat: 8.5241, lng: 76.9366 },
+  kochi: { name: "Kochi, Kerala", lat: 9.9312, lng: 76.2673 },
+  cochin: { name: "Kochi, Kerala", lat: 9.9312, lng: 76.2673 },
+  ernakulam: { name: "Ernakulam, Kerala", lat: 9.9816, lng: 76.2999 },
+  kozhikode: { name: "Kozhikode, Kerala", lat: 11.2588, lng: 75.7804 },
+  calicut: { name: "Kozhikode, Kerala", lat: 11.2588, lng: 75.7804 },
+  thrissur: { name: "Thrissur, Kerala", lat: 10.5276, lng: 76.2144 },
+  wayanad: { name: "Wayanad, Kerala", lat: 11.6854, lng: 76.1320 },
+  palakkad: { name: "Palakkad, Kerala", lat: 10.7867, lng: 76.6548 },
+  kollam: { name: "Kollam, Kerala", lat: 8.8932, lng: 76.6141 },
+  alappuzha: { name: "Alappuzha, Kerala", lat: 9.4981, lng: 76.3388 },
+  alleppey: { name: "Alappuzha, Kerala", lat: 9.4981, lng: 76.3388 },
+  kannur: { name: "Kannur, Kerala", lat: 11.8745, lng: 75.3704 },
+  kottayam: { name: "Kottayam, Kerala", lat: 9.5916, lng: 76.5222 },
+  idukki: { name: "Idukki, Kerala", lat: 9.8494, lng: 76.9804 },
+  munnar: { name: "Munnar, Idukki, Kerala", lat: 10.0889, lng: 77.0595 },
+  kasaragod: { name: "Kasaragod, Kerala", lat: 12.5102, lng: 74.9852 },
+
+  // Global Megacities & World Hubs
+  tokyo: { name: "Tokyo, Japan", lat: 35.6895, lng: 139.6917 },
+  london: { name: "London, England, UK", lat: 51.5074, lng: -0.1278 },
+  paris: { name: "Paris, France", lat: 48.8566, lng: 2.3522 },
+  "new york": { name: "New York, USA", lat: 40.7128, lng: -74.0060 },
+  "los angeles": { name: "Los Angeles, California, USA", lat: 34.0522, lng: -118.2437 },
+  "san francisco": { name: "San Francisco, California, USA", lat: 37.7749, lng: -122.4194 },
+  toronto: { name: "Toronto, Ontario, Canada", lat: 43.6532, lng: -79.3832 },
+  vancouver: { name: "Vancouver, British Columbia, Canada", lat: 49.2827, lng: -123.1207 },
+  sydney: { name: "Sydney, New South Wales, Australia", lat: -33.8688, lng: 151.2093 },
+  melbourne: { name: "Melbourne, Victoria, Australia", lat: -37.8136, lng: 144.9631 },
+  singapore: { name: "Singapore", lat: 1.3521, lng: 103.8198 },
+  dubai: { name: "Dubai, United Arab Emirates", lat: 25.2048, lng: 55.2708 },
+  "abu dhabi": { name: "Abu Dhabi, UAE", lat: 24.4539, lng: 54.3773 },
+  doha: { name: "Doha, Qatar", lat: 25.2854, lng: 51.5310 },
+  riyadh: { name: "Riyadh, Saudi Arabia", lat: 24.7136, lng: 46.6753 },
+  berlin: { name: "Berlin, Germany", lat: 52.5200, lng: 13.4050 },
+  munich: { name: "Munich, Germany", lat: 48.1351, lng: 11.5820 },
+  frankfurt: { name: "Frankfurt, Germany", lat: 50.1109, lng: 8.6821 },
+  rome: { name: "Rome, Italy", lat: 41.9028, lng: 12.4964 },
+  milan: { name: "Milan, Italy", lat: 45.4642, lng: 9.1900 },
+  madrid: { name: "Madrid, Spain", lat: 40.4168, lng: -3.7038 },
+  barcelona: { name: "Barcelona, Spain", lat: 41.3879, lng: 2.1699 },
+  moscow: { name: "Moscow, Russia", lat: 55.7558, lng: 37.6173 },
+  beijing: { name: "Beijing, China", lat: 39.9042, lng: 116.4074 },
+  shanghai: { name: "Shanghai, China", lat: 31.2304, lng: 121.4737 },
+  "hong kong": { name: "Hong Kong", lat: 22.3193, lng: 114.1694 },
+  seoul: { name: "Seoul, South Korea", lat: 37.5665, lng: 126.9780 },
+  bangkok: { name: "Bangkok, Thailand", lat: 13.7563, lng: 100.5018 },
+  "kuala lumpur": { name: "Kuala Lumpur, Malaysia", lat: 3.1390, lng: 101.6869 },
+  jakarta: { name: "Jakarta, Indonesia", lat: -6.2088, lng: 106.8456 },
+  cairo: { name: "Cairo, Egypt", lat: 30.0444, lng: 31.2357 },
+  "cape town": { name: "Cape Town, South Africa", lat: -33.9249, lng: 18.4241 },
+  nairobi: { name: "Nairobi, Kenya", lat: -1.2921, lng: 36.8219 },
 };
 
 export async function POST(request: Request) {
