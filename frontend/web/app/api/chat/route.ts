@@ -352,19 +352,39 @@ function extractMentionedDistricts(query: string, currentCity: string): string[]
   const qLower = query.toLowerCase();
   const placesSet = new Set<string>();
 
+  // 1. Direct extraction for comparison patterns: "compare X and Y", "X vs Y", "difference between X and Y"
+  const compPatterns = [
+    /(?:compare|comparison\s+(?:of|between)|difference\s+between)\s+([A-Za-z\s]+?)\s+(?:and|with|to|vs|versus)\s+([A-Za-z\s]+?)(?:\?|\.|$|\s+(?:weather|today|now))/i,
+    /([A-Za-z\s]+?)\s+(?:vs|versus)\s+([A-Za-z\s]+?)(?:\?|\.|$|\s+(?:weather|today|now))/i,
+  ];
+
+  for (const pat of compPatterns) {
+    const match = query.match(pat);
+    if (match && match[1] && match[2]) {
+      const c1 = match[1].replace(/\b(compare|comparison|difference|between|and|weather|forecast|today|now)\b/gi, "").trim();
+      const c2 = match[2].replace(/\b(compare|comparison|difference|between|and|weather|forecast|today|now)\b/gi, "").trim();
+      if (c1.length >= 2 && !NON_LOCATION_STOPWORDS.has(c1.toLowerCase())) {
+        placesSet.add(c1.charAt(0).toUpperCase() + c1.slice(1));
+      }
+      if (c2.length >= 2 && !NON_LOCATION_STOPWORDS.has(c2.toLowerCase())) {
+        placesSet.add(c2.charAt(0).toUpperCase() + c2.slice(1));
+      }
+    }
+  }
+
   const knownPlaces = [
     "modinagar", "modīnagar", "baghpat", "bagpat", "meerut", "ghaziabad", "delhi", "new delhi",
     "noida", "greater noida", "hapur", "muzaffarnagar", "shamli", "bulandshahr", "aligarh",
     "mathura", "agra", "gurugram", "gurgaon", "faridabad", "sonipat", "panipat",
     "karnal", "rohtak", "chandigarh", "dehradun", "haridwar", "rishikesh", "shimla",
     "jaipur", "lucknow", "kanpur", "varanasi", "prayagraj", "ayodhya", "patna",
-    "mumbai", "pune", "nagpur", "ahmedabad", "surat", "bengaluru", "chennai",
+    "mumbai", "pune", "nagpur", "ahmedabad", "surat", "bengaluru", "bangalore", "chennai",
     "hyderabad", "kolkata", "london", "paris", "tokyo", "new york", "dubai", "singapore",
     "sydney", "berlin", "moscow", "rome", "bangkok", "cairo", "san francisco", "toronto"
   ];
 
   for (const place of knownPlaces) {
-    const regex = new RegExp(`(?:^|[\\s/,\\-])(${place})(?:[\\s/,\\-\\?\\.]|$)`, "i");
+    const regex = new RegExp(`\\b${place}\\b`, "i");
     if (regex.test(qLower)) {
       placesSet.add(place.charAt(0).toUpperCase() + place.slice(1));
     }

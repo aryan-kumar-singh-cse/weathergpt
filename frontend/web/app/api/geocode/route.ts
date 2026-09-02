@@ -11,6 +11,10 @@ const DISTRICT_CATALOG: Array<{
   lng: number;
 }> = [
   // Delhi NCR Localities & Districts
+  { name: "Modinagar", district: "Ghaziabad District", state: "Uttar Pradesh", country: "India", countryCode: "IN", lat: 28.7695, lng: 77.5750 },
+  { name: "Baghpat", district: "Baghpat District", state: "Uttar Pradesh", country: "India", countryCode: "IN", lat: 28.9447, lng: 77.2244 },
+  { name: "Meerut", district: "Meerut District", state: "Uttar Pradesh", country: "India", countryCode: "IN", lat: 28.9845, lng: 77.7064 },
+  { name: "Hapur", district: "Hapur District", state: "Uttar Pradesh", country: "India", countryCode: "IN", lat: 28.7306, lng: 77.7759 },
   { name: "Mohan Nagar", district: "Sahibabad", state: "Uttar Pradesh", country: "India", countryCode: "IN", lat: 28.6780, lng: 77.3890 },
   { name: "Sahibabad", district: "Ghaziabad District", state: "Uttar Pradesh", country: "India", countryCode: "IN", lat: 28.6811, lng: 77.3787 },
   { name: "Indirapuram", district: "Ghaziabad District", state: "Uttar Pradesh", country: "India", countryCode: "IN", lat: 28.6415, lng: 77.3745 },

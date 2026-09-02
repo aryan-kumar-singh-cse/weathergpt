@@ -289,7 +289,16 @@ export default function ChatInputBar({
   // Auto-scroll chat history to bottom
   useEffect(() => {
     if (expanded && chatScrollRef.current) {
-      chatScrollRef.current.scrollTop = chatScrollRef.current.scrollHeight;
+      const scrollEl = chatScrollRef.current;
+      const scrollTimer = setTimeout(() => {
+        if (scrollEl) {
+          scrollEl.scrollTo({
+            top: scrollEl.scrollHeight,
+            behavior: "smooth",
+          });
+        }
+      }, 50);
+      return () => clearTimeout(scrollTimer);
     }
   }, [messages, expanded, isLoading]);
 
