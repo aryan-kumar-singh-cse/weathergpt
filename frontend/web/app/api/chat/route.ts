@@ -151,7 +151,6 @@ async function fetchLiveWeatherPipeline(lat: number, lng: number) {
       const hourlyHumidity = hourly.relative_humidity_2m || [];
       const hourlyCodes = hourly.weather_code || [];
       const hourlyRain = hourly.precipitation_probability || [];
-      const hourlyWinds = hourly.wind_speed_10m || [];
 
       const currentHour = new Date().getHours();
       const nowcastSlots: any[] = [];
@@ -360,7 +359,8 @@ function extractMentionedDistricts(query: string, currentCity: string): string[]
     "karnal", "rohtak", "chandigarh", "dehradun", "haridwar", "rishikesh", "shimla",
     "jaipur", "lucknow", "kanpur", "varanasi", "prayagraj", "ayodhya", "patna",
     "mumbai", "pune", "nagpur", "ahmedabad", "surat", "bengaluru", "chennai",
-    "hyderabad", "kolkata", "london", "paris", "tokyo", "new york", "dubai", "singapore"
+    "hyderabad", "kolkata", "london", "paris", "tokyo", "new york", "dubai", "singapore",
+    "sydney", "berlin", "moscow", "rome", "bangkok", "cairo", "san francisco", "toronto"
   ];
 
   for (const place of knownPlaces) {
@@ -385,7 +385,6 @@ function extractMentionedDistricts(query: string, currentCity: string): string[]
 
   const isComparisonQuery = /compare|comparison|vs|versus|between|difference|which is better|safer|safe|rank/i.test(qLower);
 
-  // If comparison query mentions only 1 place (e.g. "Bagpat comparison" or "compare with Bagpat"), include current city
   if (isComparisonQuery && placesSet.size === 1) {
     const cleanCurrent = currentCity.split(",")[0].trim();
     if (cleanCurrent) {
@@ -396,31 +395,72 @@ function extractMentionedDistricts(query: string, currentCity: string): string[]
   return Array.from(placesSet);
 }
 
-// Extract specific target city if user asks about a different location (e.g. "weather in Paris", "weather in Varanasi")
+const NON_LOCATION_STOPWORDS = new Set([
+  "today", "now", "tomorrow", "tonight", "morning", "afternoon", "evening", "night",
+  "yesterday", "weekend", "week", "month", "year", "rain", "temperature", "forecast",
+  "weather", "climate", "humidity", "wind", "umbrella", "clothes", "car", "wash",
+  "farming", "paddy", "sugarcane", "fertilizer", "pesticide", "storm", "lightning",
+  "thunder", "aqi", "air", "quality", "here", "there", "my area", "this place",
+  "india", "current", "future", "overview", "status", "conditions", "sky", "safe"
+]);
+
+// Extract specific target city if user asks about a location
 function extractTargetCityIfSpecified(query: string): string | null {
-  const qLower = query.toLowerCase();
+  const qLower = query.toLowerCase().trim();
   if (/compare|comparison|vs|versus|between/i.test(qLower)) return null;
 
+  // 1. Direct match for known world and Indian cities first
+  const commonPlaces = [
+    "tokyo", "paris", "london", "new york", "sydney", "singapore", "dubai", "berlin", "moscow", "rome",
+    "bangkok", "los angeles", "chicago", "toronto", "vancouver", "seoul", "beijing", "shanghai",
+    "delhi", "new delhi", "mumbai", "bengaluru", "bangalore", "kolkata", "chennai", "hyderabad",
+    "pune", "ahmedabad", "jaipur", "lucknow", "kanpur", "varanasi", "agra", "dehradun", "shimla",
+    "chandigarh", "haridwar", "rishikesh", "goa", "patna", "bhopal", "indore", "surat", "nagpur",
+    "meerut", "ghaziabad", "modinagar", "baghpat", "bagpat", "noida", "greater noida", "hapur",
+    "muzaffarnagar", "shamli", "bulandshahr", "aligarh", "mathura", "gurugram", "gurgaon", "faridabad"
+  ];
+
+  for (const place of commonPlaces) {
+    const regex = new RegExp(`\\b${place}\\b`, "i");
+    if (regex.test(qLower)) {
+      return place.charAt(0).toUpperCase() + place.slice(1);
+    }
+  }
+
+  // 2. Pattern-based extraction with clean candidate normalization
   const patterns = [
-    /weather\s+(?:in|at|for|of)\s+([A-Za-z\s]+?)(?:\?|\.|$|\s+today|\s+now|\s+tomorrow|\s+specifically)/i,
-    /temperature\s+(?:in|at|for|of)\s+([A-Za-z\s]+?)(?:\?|\.|$|\s+today|\s+now)/i,
-    /forecast\s+(?:in|at|for|of)\s+([A-Za-z\s]+?)(?:\?|\.|$|\s+today|\s+now)/i,
-    /how\s+is\s+(?:the\s+weather\s+in\s+)?([A-Za-z\s]+?)(?:\?|\.|$|\s+today|\s+now|\s+doing)/i,
-    /what\s+about\s+(?:in\s+)?([A-Za-z\s]+?)(?:\?|\.|$|\s+today|\s+now)/i,
+    /(?:weather|temp|temperature|climate|forecast|rain|conditions?|air\s+quality|aqi|nowcast)\s+(?:in|at|for|of|around|near)\s+([A-Za-z\s]+?)(?:\?|\.|$|\s+(?:today|now|tomorrow|tonight|this\s+week|specifically|right\s+now|please))/i,
+    /(?:is\s+it\s+(?:raining|cold|hot|warm|sunny|cloudy|snowing|humid|dry)\s+in)\s+([A-Za-z\s]+?)(?:\?|\.|$|\s+(?:today|now|tomorrow|tonight))/i,
+    /(?:how\s+(?:is|about)\s+(?:the\s+weather\s+in\s+)?)\s*([A-Za-z\s]+?)(?:\?|\.|$|\s+(?:today|now|tomorrow|tonight|doing))/i,
+    /(?:what\s+about\s+(?:in\s+)?)\s*([A-Za-z\s]+?)(?:\?|\.|$|\s+(?:today|now|tomorrow|tonight))/i,
+    /^([A-Za-z\s]{2,30})\s+(?:weather|temp|temperature|climate|forecast|rain|rainfall|aqi|nowcast)(?:\?|\.|$|\s+(?:today|now|tomorrow|tonight))/i,
+    /(?:tell\s+me\s+about\s+(?:the\s+weather\s+in\s+)?)\s*([A-Za-z\s]+?)(?:\?|\.|$|\s+(?:today|now|tomorrow|tonight))/i,
   ];
 
   for (const pat of patterns) {
     const m = query.match(pat);
     if (m && m[1]) {
-      const candidate = m[1].trim();
-      if (!/^(the\s+)?(evening|morning|afternoon|night|tomorrow|today|future|next\s+week|now|5\s*pm|bagpat|modinagar)$/i.test(candidate)) {
-        return candidate;
+      let candidate = m[1].trim();
+      candidate = candidate.replace(/\b(weather|forecast|temperature|temp|climate|conditions|rain|nowcast|aqi|today|now|tomorrow|tonight|city|district|state|area)\b/gi, "").trim();
+      if (candidate.length >= 2 && !NON_LOCATION_STOPWORDS.has(candidate.toLowerCase())) {
+        return candidate.charAt(0).toUpperCase() + candidate.slice(1);
       }
     }
   }
+
+  // 3. Short query fallback (e.g. "Tokyo", "London", "Shimla")
+  const words = qLower.split(/\s+/).filter(Boolean);
+  if (words.length <= 3 && !/^(hi|hello|hey|thanks|thank\s+you|help|who\s+are\s+you|what\s+can\s+you\s+do|bye|good\s+morning)$/i.test(qLower)) {
+    const cleanQuery = qLower.replace(/[^\w\s]/g, "").trim();
+    if (cleanQuery && !NON_LOCATION_STOPWORDS.has(cleanQuery)) {
+      return cleanQuery.charAt(0).toUpperCase() + cleanQuery.slice(1);
+    }
+  }
+
   return null;
 }
 
+// Smart, context-aware rule engine fallback for when LLM is unavailable
 function generateIntelligentConversationalResponse(
   query: string,
   city: string,
@@ -447,10 +487,10 @@ function generateIntelligentConversationalResponse(
 
   // 0. Unknown / Unverified Location Query
   if (isUnknownPlace && unknownPlaceName) {
-    return `⚠️ **Unverified Location Alert**: **"${unknownPlaceName}"** could not be verified in the official meteorological database.\n\n📍 Showing verified live meteorological telemetry for nearby **${city}** instead:\n- **Current Weather**: **${condition}** at **${temp}°C** (feels like **${feelsLike}°C**)\n- **24-Hour Rain Probability**: **${rainChance}%**\n- **Relative Humidity**: **${humidity}%** | Surface Winds: **${windSpeed} km/h**\n\n*If you meant a specific district or town, please enter a recognized district name (e.g. Baghpat, Meerut, Ghaziabad).*`;
+    return `⚠️ **Unverified Location Alert**: **"${unknownPlaceName}"** could not be verified in the meteorological database.\n\n📍 Showing live verified telemetry for nearby **${city}**:\n- **Current Weather**: **${condition}** at **${temp}°C** (feels like **${feelsLike}°C**)\n- **Rain Probability**: **${rainChance}%** | Humidity: **${humidity}%** | Wind: **${windSpeed} km/h**`;
   }
 
-  // 1. Multi-District Comparison with Nuanced Truthful Verdict
+  // 1. Multi-District Comparison
   if (comparativeDistricts.length >= 2 || (/compare|comparison|vs|versus/i.test(q) && comparativeDistricts.length >= 1)) {
     let table = `| District / City | Temp / Feels | Sky & Rain Chance | AQI | Safety Outlook |\n| :--- | :--- | :--- | :--- | :--- |\n`;
     for (const d of comparativeDistricts) {
@@ -465,24 +505,48 @@ function generateIntelligentConversationalResponse(
 
     let verdictText = "";
     if (minRain >= 70) {
-      verdictText = `⚠️ **Multi-District Hazard Advisory**: All compared districts (${comparativeDistricts.map((d) => `**${d.name}**`).join(", ")}) are under high precipitation and convective thunderstorm risk (**${minRain}% – ${maxRain}%** rain probability). None are completely clear or safe for open outdoor operations today. However, **${safest.name}** offers slightly lower thermal stress (${safest.temp}°C) and satisfactory air quality (AQI ${safest.aqi}).`;
+      verdictText = `⚠️ **Multi-District Hazard Advisory**: All compared districts (${comparativeDistricts.map((d) => `**${d.name}**`).join(", ")}) are under high precipitation and storm risk (**${minRain}% – ${maxRain}%** rain probability). None are completely clear today. However, **${safest.name}** offers slightly lower thermal stress (${safest.temp}°C) and satisfactory air quality (AQI ${safest.aqi}).`;
     } else if (maxRain - minRain >= 25) {
-      verdictText = `🏆 **Clear Weather Advantage**: **${safest.name}** is the safest destination with only **${safest.rainChance}%** rain probability, compared to **${rainiest.name}** with **${rainiest.rainChance}%** rain probability.`;
+      verdictText = `🏆 **Clear Weather Advantage**: **${safest.name}** has the lowest rain risk at only **${safest.rainChance}%**, compared to **${rainiest.name}** with **${rainiest.rainChance}%** rain probability.`;
     } else {
-      verdictText = `📊 **Comparative Ranking**: Weather conditions across the region are fairly uniform. **${safest.name}** ranks best overall with **${safest.rainChance}%** rain probability, **${safest.temp}°C**, and **AQI ${safest.aqi} (${safest.aqiCat})**.`;
+      verdictText = `📊 **Summary**: Weather across the compared areas is relatively uniform. **${safest.name}** is at **${safest.temp}°C** with **${safest.rainChance}%** rain chance and **AQI ${safest.aqi}**.`;
     }
 
-    return `🗺️ **Inter-District Meteorological Comparison**:\n\n${table}\n\n${verdictText}\n\n*All telemetry fetched live from regional Doppler radar and automated surface stations.*`;
+    return `🗺️ **Meteorological Comparison**:\n\n${table}\n\n${verdictText}`;
   }
 
-  // 2. Rain Timing & Confidence Breakdown (First Answer)
-  if (/timing|when will it rain|confidence|timing and confidence|hours of rain|rain time|schedule|diurnal|breakdown/i.test(q)) {
+  // 2. Drying Clothes / Laundry
+  if (/clothes|laundry|dry|drying|wash\s+clothes/i.test(q)) {
+    if (rainChance >= 40 || humidity >= 75) {
+      return `🧺 **Not recommended to dry clothes outside today in ${city}.**\n\nRain probability is **${rainChance}%** and relative humidity is high at **${humidity}%** under **${condition}**. Clothes will take a long time to dry and risk getting wet. It is best to dry them indoors.`;
+    }
+    return `🧺 **Yes, today is a great day to dry clothes outside in ${city}!**\n\nRain probability is only **${rainChance}%**, humidity is **${humidity}%**, and current temperature is **${temp}°C** under **${condition}**.`;
+  }
+
+  // 3. Car Wash / Cleaning
+  if (/car\s+wash|wash\s+car|clean\s+car/i.test(q)) {
+    if (rainChance >= 35) {
+      return `🚗 **Hold off on washing your car today in ${city}.**\n\nThere is a **${rainChance}%** chance of rain with **${condition}**, which will leave water spots and mud on your freshly washed vehicle.`;
+    }
+    return `🚗 **Good day for a car wash in ${city}!**\n\nRain probability is low (**${rainChance}%**) with **${condition}** and **${temp}°C** temperature.`;
+  }
+
+  // 4. Outdoor Activities / Running / Cycling / Picnic
+  if (/jog|run|running|cycling|picnic|walk|outdoor|cricket|football|workout/i.test(q)) {
+    if (rainChance >= 60 || temp >= 40 || astroEnv?.aqi > 250) {
+      return `🏃 **Outdoor activities are not ideal today in ${city}.**\n\nCurrent conditions: **${temp}°C** (${condition}), **${rainChance}%** rain risk, and AQI **${astroEnv?.aqi}**. Consider indoor workouts or wait until conditions ease.`;
+    }
+    return `🏃 **Good conditions for outdoor activities in ${city}!**\n\nCurrent temperature is **${temp}°C** (feels like **${feelsLike}°C**) with **${windSpeed} km/h** breeze and **${rainChance}%** rain chance.`;
+  }
+
+  // 5. Rain Timing & Confidence Breakdown
+  if (/timing|when will it rain|confidence|hours of rain|rain time|schedule|diurnal|breakdown/i.test(q)) {
     const morning = diurnal?.morning || { temp: 28, condition: "Partly Cloudy", rainChance: 30, confidence: "High (85%)" };
     const afternoon = diurnal?.afternoon || { temp: 33, condition: "Heavy Rain", rainChance: 95, confidence: "Very High (95%)" };
     const eveningSlot = diurnal?.evening || { temp: 27, condition: "Thunderstorm", rainChance: 90, confidence: "High (90%)" };
     const night = diurnal?.night || { temp: 24, condition: "Light Rain", rainChance: 60, confidence: "Medium (75%)" };
 
-    const peakWindow = afternoon.rainChance >= eveningSlot.rainChance ? "Afternoon (13:00 – 17:00)" : "Evening (17:00 – 21:00)";
+    const peakWindow = afternoon.rainChance >= eveningSlot.rainChance ? "Afternoon (12:00 – 16:00)" : "Evening (17:00 – 21:00)";
     const peakChance = Math.max(afternoon.rainChance, eveningSlot.rainChance, morning.rainChance, night.rainChance);
 
     return `🌧️ **Diurnal Rain Timing & Confidence Breakdown for ${city}**:\n\n` +
@@ -492,70 +556,204 @@ function generateIntelligentConversationalResponse(
       `| ☀️ **Afternoon (12:00 – 16:00)** | ${afternoon.condition} (${afternoon.temp}°C) | **${afternoon.rainChance}%** | ${afternoon.confidence} |\n` +
       `| 🌆 **Evening (17:00 – 21:00)** | ${eveningSlot.condition} (${eveningSlot.temp}°C) | **${eveningSlot.rainChance}%** | ${eveningSlot.confidence} |\n` +
       `| 🌙 **Night (22:00 – 05:00)** | ${night.condition} (${night.temp}°C) | **${night.rainChance}%** | ${night.confidence} |\n\n` +
-      `⚡ **Peak Convective Window**: Highest storm intensity and rainfall probability will occur in the **${peakWindow}** (up to **${peakChance}%** chance, **95% Confidence Rating**).\n\n` +
-      `*Confidence computed via multi-model ensemble agreement (ECMWF, GFS, IMD Doppler telemetry).*`;
+      `⚡ **Peak Convective Window**: Highest rainfall probability is in the **${peakWindow}** (up to **${peakChance}%** chance).`;
   }
 
-  // 3. Specific Evening / 5 PM Follow-up
+  // 6. Specific Evening / 5 PM Follow-up
   if (/evening|after 5|5 pm|5pm|6 pm|6pm|7 pm/i.test(q)) {
     const eve = diurnal?.evening || { temp: temp - 2, rainChance, condition };
     const needUmbrella = eve.rainChance >= 35 || /rain|drizzle|shower/i.test(eve.condition);
 
-    return `🌆 **Evening (5:00 PM – 9:00 PM) Outlook for ${city}**:\n\n` +
-      `- **Rain Probability After 5 PM**: **${eve.rainChance}%** (${eve.condition})\n` +
-      `- **Expected Evening Temperature**: **${eve.temp}°C**\n` +
-      `- **Umbrella Recommendation**: ${needUmbrella ? "🌧️ **YES, carry an umbrella after 5 PM.** Rain probability is high (**" + eve.rainChance + "%**) with potential showers." : "☀️ **NO umbrella needed after 5 PM.** Rain probability is minimal (**" + eve.rainChance + "%**) under **" + eve.condition + "**."}\n\n` +
-      `Plan your evening commute with weather-awareness!`;
+    return `🌆 **Evening Outlook for ${city} (5:00 PM – 9:00 PM)**:\n\n` +
+      `- **Expected Temperature**: **${eve.temp}°C**\n` +
+      `- **Rain Probability**: **${eve.rainChance}%** (${eve.condition})\n` +
+      `- **Umbrella Advisory**: ${needUmbrella ? "🌧️ **Yes, keep an umbrella handy.** Showers are expected." : "☀️ **No umbrella needed.** Dry conditions expected."}`;
   }
 
-  // 4. Farmer / Agricultural / Paddy / Sugarcane / Irrigation / Spraying
+  // 7. Tomorrow / Future Forecast
+  if (/tomorrow|next day|weekend|3 days|forecast/i.test(q)) {
+    if (forecast && forecast.length > 1) {
+      const tmrw = forecast[1];
+      return `📅 **Tomorrow's Weather Outlook for ${city} (${tmrw.day}, ${tmrw.date})**:\n\n- **Condition**: **${tmrw.condition}**\n- **Temperature**: High **${tmrw.highTemp}°C** / Low **${tmrw.lowTemp}°C**\n- **Rain Chance**: **${tmrw.rainChance}%**\n\n${tmrw.rainChance >= 40 ? "⚠️ Carry rain protection if planning to travel." : "☀️ Pleasant conditions expected for outdoor activities."}`;
+    }
+  }
+
+  // 8. Air Quality / AQI / Pollution
+  if (/aqi|air quality|pollution|pm2.5|pm10|smog|breathe/i.test(q)) {
+    return `🌬️ **Air Quality Status for ${city}**:\n\n- **NAQI Index**: **${astroEnv?.aqi ?? 105}**\n- **Category**: **${astroEnv?.aqiCategory ?? "Moderate"}**\n- **Relative Humidity**: **${humidity}%** | Wind: **${windSpeed} km/h**\n\n${astroEnv?.aqi > 200 ? "⚠️ Sensitive individuals should wear masks outdoors." : "✅ Air quality is within acceptable limits for general public."}`;
+  }
+
+  // 9. Temperature & Heat
+  if (/temperature|temp|how hot|how cold|feels like|heat|warm/i.test(q)) {
+    return `🌡️ **Temperature in ${city}**:\n\nCurrently **${temp}°C** (feels like **${feelsLike}°C**).\nToday's expected high is **${maxTemp}°C** and low is **${minTemp}°C** under **${condition}**.`;
+  }
+
+  // 10. Farmer / Agricultural Guidance
   if (/farmer|krishi|irrigate|irrigation|paddy|sugarcane|crop|wheat|sow|spray|pesticide|fertilizer/i.test(q)) {
     const shouldIrrigate = rainChance < 30;
     const spraySafe = windSpeed <= 15 && rainChance <= 30;
 
-    return `🌾 **Krishi Agromet Advisory for ${city} (Farmers' Direct Guidance)**:\n\n` +
-      `1. **Irrigation Decision (Paddy & Sugarcane)**:\n` +
-      `   ${shouldIrrigate ? "✅ **Proceed with light to moderate irrigation.** Rain probability is low (" + rainChance + "%). Water early in the morning or late evening." : "🚫 **DO NOT irrigate paddy or sugarcane today.** Rain probability is high (" + rainChance + "%). Natural rainfall will supply sufficient moisture. Skipping irrigation prevents waterlogging, avoids root asphyxiation, stops nutrient leaching, and saves diesel/electricity costs."}\n\n` +
-      `2. **Pesticide & Chemical Spraying**:\n` +
-      `   ${spraySafe ? "✅ **Safe window for chemical & foliar spraying.** Wind speed is light (" + windSpeed + " km/h) and rain risk is low." : "⚠️ **Postpone all pesticide and fertilizer spraying for 24–48 hours.** Winds (" + windSpeed + " km/h) and impending rain (" + rainChance + "%) will cause chemical drift and foliage wash-off."}\n\n` +
-      `3. **Field Drainage**:\n` +
-      `   Ensure drainage channels in low-lying sugarcane and paddy plots are free from silt to prevent water stagnation during downpours.\n\n` +
-      `*(Aligned with ICAR & IMD Agromet Advisory Standards)*`;
+    return `🌾 **Agricultural Agromet Advisory for ${city}**:\n\n` +
+      `1. **Irrigation (Paddy & Sugarcane)**: ${shouldIrrigate ? "✅ **Proceed with light to moderate irrigation.** Rain risk is low (" + rainChance + "%)." : "🚫 **Do not irrigate today.** Rain probability is high (" + rainChance + "%). Natural rainfall will meet crop water requirements and prevent waterlogging/root rot."}\n` +
+      `2. **Pesticide / Fertilizer Spraying**: ${spraySafe ? "✅ **Safe window for spraying.** Winds are calm (" + windSpeed + " km/h)." : "⚠️ **Postpone chemical spraying for 24–48 hours** due to rain/wind drift risk."}\n` +
+      `3. **Drainage**: Keep drainage furrows clear in low-lying plots to avoid standing water.`;
   }
 
-  // 5. Thunderstorm / Lightning / Disaster / Extreme Safety Actions
+  // 11. Thunderstorm & Lightning Life-Safety
   if (/thunder|lightning|storm|hazard|emergency|warning|alert|safety|protocol|damini/i.test(q)) {
-    return `🚨 **Immediate Thunderstorm & Lightning Life-Safety Directives for ${city}**:\n\n` +
-      `⚠️ **Actionable Life-Saving Instructions**:\n` +
-      `1. 🏠 **Seek Immediate Indoor Shelter**: Move inside a sturdy pucca/concrete building or fully enclosed metal vehicle immediately.\n` +
-      `2. 🌳 **Avoid High-Risk Outdoor Hazards**: NEVER take shelter under tall isolated trees, tin sheds, open crop fields, high ridges, or near wire fences, poles, and standing water.\n` +
-      `3. ⚡ **Electrical & Domestic Safety**: Unplug sensitive electrical appliances; avoid wired electronics and stay clear of indoor plumbing fixtures during lightning.\n` +
-      `4. 🌾 **Agricultural Workers & Farmers**: Stop all field operations immediately, drop all metal tools (hoes, sickles, spades, irrigation pipes), and seek shelter. If caught in an open field with no shelter, crouch low on the balls of your feet with head tucked down (lightning squat) — never lie flat on the ground.\n` +
-      `5. 🚗 **Road & Commuter Safety**: Do not walk or drive through waterlogged roads, inundated culverts, or underpasses. Turn around, don't drown.\n` +
-      `6. ⏱️ **30-30 Rule**: If the time between lightning flash and thunder is under 30 seconds, lightning is dangerously close. Remain sheltered until 30 minutes after the last audible thunderclap.`;
+    return `🚨 **Thunderstorm & Lightning Life-Safety Directives for ${city}**:\n\n` +
+      `1. 🏠 **Seek Indoor Shelter**: Move inside a sturdy pucca building or fully enclosed metal vehicle immediately.\n` +
+      `2. 🌳 **Avoid Hazards**: Never shelter under isolated trees, tin sheds, or open fields.\n` +
+      `3. ⚡ **Electronics**: Unplug electrical appliances and avoid contact with plumbing fixtures.\n` +
+      `4. 🌾 **Farmers**: Drop metal tools (hoes, sickles) immediately and move away from tall equipment.\n` +
+      `5. ⏱️ **30-30 Rule**: If thunder sounds within 30 seconds of lightning, stay sheltered until 30 minutes after the last thunderclap.`;
   }
 
-  // 6. Hourly Nowcast / Next 3 Hours
-  if (/nowcast|hourly|next 3 hours|next 6 hours|3 hours|next few hours/i.test(q)) {
-    if (nowcastSlots && nowcastSlots.length > 0) {
-      const slots = nowcastSlots.slice(0, 4).map((s: any) => {
-        const rChance = s.rainChance !== undefined ? s.rainChance : (s.rainProb ?? 0);
-        return `- **${s.time}**: **${s.temp}°C** (${s.condition}) • 💧 **${rChance}%** rain chance • 💨 **${s.humidity}%** humidity`;
-      }).join("\n");
-      return `⏱️ **High-Resolution Ground Telemetry Nowcast for ${city}**:\n\n${slots}\n\n*Updated real-time from automated surface observing systems.*`;
-    }
-  }
-
-  // 7. General Rain & Umbrella Fallback
-  if (/umbrella|rain|raining|raincoat|shower|drizzle|precipitation|wet/i.test(q)) {
+  // 12. General Rain & Umbrella
+  if (/umbrella|rain|raining|shower|drizzle|precipitation/i.test(q)) {
     if (rainChance >= 35 || /rain|drizzle|shower/i.test(condition)) {
-      return `🌧️ **Yes, carry an umbrella in ${city} today!**\n\nRain probability is currently **${rainChance}%** with **${condition}** and **${humidity}%** humidity. Temperature is **${temp}°C** (feels like **${feelsLike}°C**). Keep rain protection handy when stepping out.`;
+      return `🌧️ **Yes, carry an umbrella in ${city} today.**\n\nRain probability is currently **${rainChance}%** under **${condition}** with **${temp}°C** temperature and **${humidity}%** humidity.`;
     }
-    return `☀️ **No need for an umbrella in ${city} today!**\n\nRain probability is low at **${rainChance}%** under **${condition}**. Temperature is **${temp}°C** with **${windSpeed} km/h** breeze.`;
+    return `☀️ **No umbrella needed in ${city} today.**\n\nRain probability is low at **${rainChance}%** under **${condition}** with **${temp}°C** temperature.`;
   }
 
-  // 8. General Telemetry Overview
-  return `Live Meteorological Intelligence for **${city}**:\n\nCurrently, it is **${condition}** at **${temp}°C** (feels like **${feelsLike}°C**). Today's range is **${maxTemp}°C High / ${minTemp}°C Low** with **${humidity}%** relative humidity, **${windSpeed} km/h** winds, and **${rainChance}%** rain probability. Air quality index is **AQI ${astroEnv?.aqi ?? 105} (${astroEnv?.aqiCategory ?? "Moderate"})**.\n\nAsk me about 🌧️ rain timing & confidence, 🗺️ district comparisons, 🏃 activities, 🌾 farming, ⚡ safety, or 🕒 evening plans!`;
+  // 13. General Conversational Overview
+  return `Currently in **${city}**, the weather is **${condition}** at **${temp}°C** (feels like **${feelsLike}°C**).\n\n- **Today's Range**: High **${maxTemp}°C** / Low **${minTemp}°C**\n- **Rain Probability**: **${rainChance}%** | Humidity: **${humidity}%**\n- **Surface Winds**: **${windSpeed} km/h** | Air Quality: **AQI ${astroEnv?.aqi ?? 105} (${astroEnv?.aqiCategory ?? "Moderate"})**\n\nFeel free to ask about rain timing, 5-day forecast, drying clothes, farming advice, or any other city's weather!`;
+}
+
+// Call Google Gemini Native REST API with robust model fallback
+async function callGeminiNative(
+  userQuery: string,
+  systemPrompt: string,
+  history: any[] = [],
+  apiKey: string
+): Promise<string | null> {
+  const models = [
+    process.env.LLM_SECONDARY_MODEL || "gemini-3.5-flash",
+    "gemini-3.6-flash",
+    "gemini-3.7-flash",
+    "gemini-flash-latest",
+    "gemini-3.5-flash-lite",
+    "gemini-pro-latest"
+  ];
+
+  const contents: any[] = [];
+
+  if (Array.isArray(history) && history.length > 0) {
+    for (const h of history.slice(-6)) {
+      const msgRole = (h.role === "assistant" || h.sender === "assistant") ? "model" : "user";
+      const text = h.content || h.text || "";
+      if (text && typeof text === "string") {
+        contents.push({
+          role: msgRole,
+          parts: [{ text: text.slice(0, 500) }]
+        });
+      }
+    }
+  }
+
+  contents.push({
+    role: "user",
+    parts: [{ text: userQuery }]
+  });
+
+  for (const model of models) {
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 6000);
+
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+      const payload = {
+        system_instruction: {
+          parts: [{ text: systemPrompt }]
+        },
+        contents,
+        generationConfig: {
+          temperature: 0.7,
+          maxOutputTokens: 800
+        }
+      };
+
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+        signal: controller.signal
+      });
+
+      clearTimeout(timeout);
+
+      if (res.ok) {
+        const data = await res.json();
+        const rawReply = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+        const reply = stripInternalThinking(rawReply || "");
+        if (reply) {
+          console.log(`[WeatherGPT] Answered via Gemini (${model})`);
+          return reply;
+        }
+      }
+    } catch (err) {
+      console.warn(`[WeatherGPT] Gemini (${model}) attempt failed:`, err);
+    }
+  }
+  return null;
+}
+
+// Call Groq / OpenAI-compatible endpoint
+async function callGroqLLM(
+  userQuery: string,
+  systemPrompt: string,
+  history: any[] = [],
+  apiKey: string
+): Promise<string | null> {
+  const models = ["llama-3.3-70b-versatile", "llama-3.1-8b-instant", "mixtral-8x7b-32768", "gemma2-9b-it"];
+  const messages: any[] = [{ role: "system", content: systemPrompt }];
+
+  if (Array.isArray(history) && history.length > 0) {
+    for (const h of history.slice(-6)) {
+      const msgRole = (h.role === "assistant" || h.sender === "assistant") ? "assistant" : "user";
+      const text = h.content || h.text || "";
+      if (text && typeof text === "string") {
+        messages.push({ role: msgRole, content: text.slice(0, 500) });
+      }
+    }
+  }
+
+  messages.push({ role: "user", content: userQuery });
+
+  for (const model of models) {
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 4000);
+      const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${apiKey}`,
+        },
+        signal: controller.signal,
+        body: JSON.stringify({
+          model,
+          messages,
+          temperature: 0.6,
+          max_tokens: 800,
+        }),
+      });
+      clearTimeout(timeout);
+      if (res.ok) {
+        const data = await res.json();
+        const rawReply = data.choices?.[0]?.message?.content;
+        const reply = stripInternalThinking(rawReply || "");
+        if (reply) {
+          console.log(`[WeatherGPT] Answered via Groq (${model})`);
+          return reply;
+        }
+      }
+    } catch (err) {
+      console.warn(`[WeatherGPT] Groq (${model}) attempt failed:`, err);
+    }
+  }
+  return null;
 }
 
 async function callDirectLLM(
@@ -566,120 +764,39 @@ async function callDirectLLM(
   language: string,
   history: any[] = []
 ): Promise<string | null> {
-  const groqKey = process.env.GROQ_API_KEY;
-  const geminiKey = process.env.GEMINI_API_KEY;
+  const geminiKey = process.env.GEMINI_API_KEY || process.env.LLM_SECONDARY_API_KEY;
+  const groqKey = process.env.GROQ_API_KEY || process.env.LLM_PRIMARY_API_KEY;
 
-  const systemPrompt = `You are WeatherGPT PRO, an advanced sovereign meteorological AI intelligence system.
-You have access to live meteorological telemetry, Doppler radar feeds, CPCB AQI data, and agricultural/safety protocols.
+  const systemPrompt = `You are WeatherGPT, an advanced AI weather intelligence assistant.
+Answer the user's specific question directly, concisely, and naturally based on the verified ground-truth meteorological telemetry below.
 
-METEOROLOGICAL TELEMETRY & CONTEXT:
+GROUND-TRUTH METEOROLOGICAL TELEMETRY & CONTEXT FOR ${city}:
 ${weatherContext}
 
 USER ROLE: ${role}
-TARGET REGIONAL LANGUAGE: ${language}
+TARGET LANGUAGE: ${language}
 
-CRITICAL EXPERT DIRECTIVES:
-1. DISTRICT COMPARISONS & VERDICT LOGIC:
-   - When comparing districts, present a structured Markdown comparison table (District, Temp/Feels, Sky/Rain Chance %, AQI, Safety Outlook).
-   - VERDICT ACCURACY: If all locations have high rain probability (>=70%), state: "All compared locations face high convective/rain risk; none are completely clear today. However, [District X] is relatively better due to [AQI/temperature]." Do NOT say "lowest rain risk" if rain probability is 95-100%!
-2. RAIN TIMING & CONFIDENCE:
-   - When asked for timing and confidence, break down into 4 clear diurnal windows: Morning (06:00-11:00), Afternoon (12:00-16:00), Evening (17:00-21:00), Night (22:00-05:00) with concrete rain probabilities, sky conditions, and confidence levels. State the peak rainfall window clearly.
-3. SPECIFIC TIME WINDOWS: If asked about evening/5 PM, provide the exact evening temperature and rain chance.
-4. FARMERS (Paddy / Sugarcane / Crops):
-   - For Irrigation: If rain probability is high (>=35%), explicitly state: "Do not irrigate paddy or sugarcane today — natural rainfall will supply soil moisture. Skipping irrigation prevents waterlogging, avoids root rot, stops nutrient leaching, and saves pumping/electricity costs." If dry (<20%), advise light morning watering.
-   - For Chemical Spraying: Postpone pesticide/fertilizer spraying if rain or wind is high.
-5. LIFE-SAVING EMERGENCY SAFETY:
-   - Give immediate, imperative actions for thunderstorms: Go indoors into a sturdy building or vehicle; avoid tall isolated trees, tin sheds, and open crop fields; unplug electrical appliances; drop metal farm tools; avoid waterlogged roads; follow the 30-30 lightning rule.
-6. UNVERIFIED / UNKNOWN PLACES:
-   - If the user asks about an unknown place (e.g. "Blorptown near Bagpat"), state clearly that the place could not be verified in the meteorological database, and provide verified data for the nearby reference district.
-7. MULTILINGUAL: Answer ENTIRELY in the target language code (${language}).`;
+CORE INSTRUCTIONS:
+1. ANSWER DIRECTLY & RELEVANTLY: Focus specifically on what the user asked (e.g. drying clothes, umbrella, car wash, evening plans, temperature, tomorrow, upcoming days, jogging, farming, comparison, or science question).
+2. DO NOT DUMP UNREQUESTED DATA: If asked a simple question (e.g. "Can I dry my clothes?"), give a clear 2-3 sentence answer explaining why based on the rain chance, temperature, and humidity. Do not dump the entire daily schedule or unrequested metrics.
+3. CONVERSATIONAL & NATURAL: Speak in a helpful, friendly, and expert tone. Follow up naturally on previous messages in the conversation.
+4. TOMORROW & MULTI-DAY FORECAST: You have full verified upcoming forecast telemetry for ${city} (including tomorrow's high/low temperatures, rain chance %, and condition). Answer tomorrow or upcoming forecast questions accurately using this data.
+5. DISTRICT COMPARISONS: If the user asks to compare locations, output a clear Markdown comparison table followed by a nuanced verdict. If all areas face high rain risk (>=70%), state that all are wet and highlight the relatively better option for temperature or AQI.
+6. RAIN TIMING: If asked for rain timing/breakdown, provide the 4 diurnal slots (Morning, Afternoon, Evening, Night) with the peak rain window.
+7. FARMING / KRISHI: For farmers, provide clear guidance on irrigation (skip if rain >=35% to avoid waterlogging and root rot) and chemical spraying (hold if wind >15 km/h or rain).
+8. MULTILINGUAL: If the user writes in Hindi or other regional language, respond completely in that language.
+9. NO INTERNAL REASONING: Never output <think> tags or reasoning logs.`;
 
-  const messages: any[] = [{ role: "system", content: systemPrompt }];
-
-  if (Array.isArray(history) && history.length > 0) {
-    for (const h of history.slice(-8)) {
-      const msgRole = (h.role === "user" || h.sender === "user") ? "user" : "assistant";
-      const text = h.text || h.content || "";
-      if (text && typeof text === "string") {
-        messages.push({ role: msgRole, content: text.slice(0, 600) });
-      }
-    }
-  }
-
-  messages.push({ role: "user", content: userQuery });
-
-  // 1. Primary: Groq Ultra-Fast Models
-  if (groqKey && !groqKey.startsWith("your-")) {
-    const groqModels = ["openai/gpt-oss-20b", "qwen/qwen3.6-27b", "openai/gpt-oss-120b", "groq/compound"];
-    for (const model of groqModels) {
-      try {
-        const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 4000);
-        const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${groqKey}`,
-          },
-          signal: controller.signal,
-          body: JSON.stringify({
-            model,
-            messages,
-            temperature: 0.6,
-            max_tokens: 800,
-          }),
-        });
-        clearTimeout(timeout);
-        if (res.ok) {
-          const data = await res.json();
-          const rawReply = data.choices?.[0]?.message?.content;
-          const reply = stripInternalThinking(rawReply || "");
-          if (reply) {
-            console.log(`[WeatherGPT] Answered via Groq (${model})`);
-            return reply;
-          }
-        }
-      } catch (err) {
-        console.warn(`[WeatherGPT] Groq (${model}) attempt failed:`, err);
-      }
-    }
-  }
-
-  // 2. Secondary: Google Gemini Flash Models
+  // 1. Primary: Gemini Native API
   if (geminiKey && !geminiKey.startsWith("your-")) {
-    const geminiModels = ["gemini-2.5-flash", "gemini-3.6-flash", "gemini-flash-latest"];
-    for (const model of geminiModels) {
-      try {
-        const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 4000);
-        const res = await fetch("https://generativelanguage.googleapis.com/v1beta/openai/chat/completions", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${geminiKey}`,
-          },
-          signal: controller.signal,
-          body: JSON.stringify({
-            model,
-            messages,
-            temperature: 0.6,
-            max_tokens: 800,
-          }),
-        });
-        clearTimeout(timeout);
-        if (res.ok) {
-          const data = await res.json();
-          const rawReply = data.choices?.[0]?.message?.content;
-          const reply = stripInternalThinking(rawReply || "");
-          if (reply) {
-            console.log(`[WeatherGPT] Answered via Gemini (${model})`);
-            return reply;
-          }
-        }
-      } catch (err) {
-        console.warn(`[WeatherGPT] Gemini (${model}) attempt failed:`, err);
-      }
-    }
+    const res = await callGeminiNative(userQuery, systemPrompt, history, geminiKey);
+    if (res) return res;
+  }
+
+  // 2. Secondary: Groq API
+  if (groqKey && !groqKey.startsWith("your-")) {
+    const res = await callGroqLLM(userQuery, systemPrompt, history, groqKey);
+    if (res) return res;
   }
 
   return null;
@@ -708,7 +825,7 @@ export async function POST(request: Request) {
     let isUnknownPlace = false;
     let unknownPlaceName = "";
 
-    // Check if user specifically asked about a different target city in prompt (e.g. "weather in Paris", "weather in Varanasi")
+    // Check if user specified a target city in the query (e.g. "Tokyo", "weather in Varanasi", "Paris forecast")
     const explicitTargetCity = extractTargetCityIfSpecified(message || "");
     let baseLocation = explicitTargetCity || location || "Modinagar, Ghaziabad";
 
@@ -717,7 +834,7 @@ export async function POST(request: Request) {
       resolvedLng = undefined;
     }
 
-    // Forward geocode location if coordinates are missing
+    // Geocode location if coordinates are missing or if a new target city was specified
     if (resolvedLat === undefined || resolvedLng === undefined) {
       if (baseLocation) {
         const cleanLoc = baseLocation.split(",")[0].trim();
@@ -731,13 +848,16 @@ export async function POST(request: Request) {
               resolvedLat = geoData.results[0].latitude;
               resolvedLng = geoData.results[0].longitude;
               baseLocation = `${geoData.results[0].name}, ${geoData.results[0].admin1 || geoData.results[0].country || "Region"}`;
+            } else if (explicitTargetCity) {
+              isUnknownPlace = true;
+              unknownPlaceName = explicitTargetCity;
             }
           }
         } catch {}
       }
     }
 
-    // Detect if query asks about an unverified / unknown location
+    // Detect if query explicitly tests unknown / fictitious places
     if (message) {
       const unknownMatch = message.match(/\b(blorptown|fakecity|unknownplace|xyzland|nonexistent|blorp|unknown place like\s+([A-Za-z]+))\b/i);
       if (unknownMatch) {
@@ -834,7 +954,6 @@ export async function POST(request: Request) {
       night: { rainChance: 20, temp: resolvedTemp - 4, condition: "Clear Sky", confidence: "Medium (80%)" },
     };
 
-    // Construct comparative context if requested
     let comparativeContext = "";
     if (comparativeDistricts.length > 0) {
       comparativeContext = `\nINTER-DISTRICT COMPARISON DATA:\n` +
@@ -853,12 +972,12 @@ export async function POST(request: Request) {
   * Night (22:00–05:00): ${diurnal.night.temp}°C, ${diurnal.night.condition}, ${diurnal.night.rainChance}% rain (${diurnal.night.confidence})
 - Air Quality (CPCB NAQI Standard): AQI ${astroEnv?.aqi ?? 105} (${astroEnv?.aqiCategory ?? "Moderate"})
 - Solar & UV Index: ${astroEnv?.uvIndex ?? 5.4} (Sunrise: ${astroEnv?.sunrise ?? "05:58"} IST, Sunset: ${astroEnv?.sunset ?? "18:43"} IST)
-- Active IMD Warning: ${astroEnv?.imdWarning || "None (Green Status)"}
+- Active Warning: ${astroEnv?.imdWarning || "None (Green Status)"}
 - 3-Hourly Telemetry Nowcast: ${(livePinpoint.nowcastSlots || []).slice(0, 4).map((s: any) => `${s.time}: ${s.temp}°C (${s.condition}, ${s.rainChance}% rain)`).join(" | ")}
-- Next 3-Day Forecast: ${formattedForecast.slice(1, 4).map((f: any) => `${f.day}: ${f.highTemp}°C/${f.lowTemp}°C, ${f.rainChance}% rain (${f.condition})`).join(" | ")}${comparativeContext}
+- Upcoming Forecast: Tomorrow (${formattedForecast[1]?.day || "Next Day"}): High ${formattedForecast[1]?.highTemp ?? maxTemp}°C / Low ${formattedForecast[1]?.lowTemp ?? minTemp}°C, ${formattedForecast[1]?.rainChance ?? rainChance}% rain chance (${formattedForecast[1]?.condition || "Partly Cloudy"}) | ${formattedForecast.slice(2, 5).map((f: any) => `${f.day}: High ${f.highTemp}°C / Low ${f.lowTemp}°C, ${f.rainChance}% rain (${f.condition})`).join(" | ")}${comparativeContext}
 ${isUnknownPlace ? `\n⚠️ UNVERIFIED LOCATION ALERT: User queried "${unknownPlaceName}" which is unverified in the meteorological database.` : ""}`;
 
-    // LLM-First Response Architecture with Smart Fallback
+    // LLM-First Response Architecture with Smart Contextual Fallback
     let narrativeResponse = await callDirectLLM(
       message,
       currentCityName,

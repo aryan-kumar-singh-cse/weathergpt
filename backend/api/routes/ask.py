@@ -131,7 +131,7 @@ async def _fetch_historical_data(
 class AskRequest(BaseModel):
     """Request model for /api/ask endpoint."""
     query: str
-    email: str  # Required for authentication and rate limiting
+    email: Optional[str] = "demo@weathergpt.local"  # Default demo email for rate-limiting and persistence
     language: str = "en"
     role: str = "citizen"
     location: Optional[str] = None
@@ -171,14 +171,13 @@ async def ask_weather_question(
     if not request.query or not request.query.strip():
         raise HTTPException(status_code=400, detail="Query cannot be empty")
 
-    if not request.email or not request.email.strip():
-        raise HTTPException(status_code=401, detail="Email is required. Please login first.")
+    email = request.email if request.email and request.email.strip() else "demo@weathergpt.local"
 
     # Check if user exists or auto-create seamlessly
-    user = auth_service.get_user(request.email, db)
+    user = auth_service.get_user(email, db)
     if not user:
         user = auth_service.login_or_create_user(
-            email=request.email,
+            email=email,
             occupation=request.role.title(),
             location=request.location or "Delhi",
             preferred_language=request.language or "en",
@@ -186,9 +185,9 @@ async def ask_weather_question(
         )
 
     # Check rate limit (1000/day for default web users, standard limit for others)
-    max_questions = 1000 if request.email.endswith("@weathergpt.local") else settings.MAX_QUESTIONS_PER_DAY
+    max_questions = 1000 if email.endswith("@weathergpt.local") else 20
     is_allowed, requests_made, requests_remaining = auth_service.check_rate_limit(
-        email=request.email,
+        email=email,
         endpoint="/api/v1/ask",
         db=db,
         max_requests=max_questions
@@ -202,7 +201,7 @@ async def ask_weather_question(
 
     # Log this API usage for rate limiting
     auth_service.log_usage(
-        email=request.email,
+        email=email,
         endpoint="/api/v1/ask",
         db=db
     )

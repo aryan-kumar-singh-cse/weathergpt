@@ -2,15 +2,25 @@
 WeatherGPT LLM Service
 Two-tier provider fallback chain using shared environment API keys
 - Primary Tier: Groq API
-- Secondary Tier: Google Gemini API
+- Secondary Tier: Google Gemini API (OpenAI-compatible & Native REST fallback)
 """
 
 import os
 import json
 import logging
+import re
 from typing import List, Dict, Any, Optional
 import asyncio
-from openai import AsyncOpenAI
+import httpx
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass
+try:
+    from openai import AsyncOpenAI
+except ImportError:
+    AsyncOpenAI = None
 
 logger = logging.getLogger(__name__)
 
@@ -19,18 +29,16 @@ class LLMService:
     """
     Unified LLM service with two-tier fallback using shared team environment variables:
     - Tier A (Primary): Groq (fast, low latency)
-    - Tier B (Secondary): Gemini (reliable fallback)
-
-    All tiers speak OpenAI-compatible chat/completions API.
+    - Tier B (Secondary): Gemini (reliable fallback with native REST resilience)
     """
 
     def __init__(self):
         self.last_tier_used = None
-        self.timeout = float(os.getenv("LLM_TIMEOUT", "10.0"))  # seconds per tier attempt
+        self.timeout = float(os.getenv("LLM_TIMEOUT", "10.0"))
 
-        # Model names (can be overridden via environment)
+        # Model names
         self.primary_model = os.getenv("LLM_PRIMARY_MODEL", "llama-3.3-70b-versatile")
-        self.secondary_model = os.getenv("LLM_SECONDARY_MODEL", "gemini-2.0-flash")
+        self.secondary_model = os.getenv("LLM_SECONDARY_MODEL", "gemini-3.5-flash")
 
         # Base URLs
         self.primary_base_url = os.getenv("LLM_PRIMARY_BASE_URL", "https://api.groq.com/openai/v1")
@@ -50,6 +58,67 @@ class LLMService:
     def _get_secondary_key(self) -> Optional[str]:
         return os.getenv("GEMINI_API_KEY") or os.getenv("LLM_SECONDARY_API_KEY") or self.secondary_api_key
 
+    def _clean_response(self, text: str) -> str:
+        if not text:
+            return ""
+        clean = re.sub(r'<think>[\s\S]*?</think>', '', text, flags=re.IGNORECASE)
+        clean = re.sub(r'<think>[\s\S]*$', '', clean, flags=re.IGNORECASE)
+        clean = re.sub(r'\[think(?:ing)?\][\s\S]*?\[\/think(?:ing)?\]', '', clean, flags=re.IGNORECASE)
+        clean = re.sub(r'\[think(?:ing)?\][\s\S]*$', '', clean, flags=re.IGNORECASE).strip()
+        return clean
+
+    async def _call_gemini_native(
+        self,
+        model: str,
+        messages: List[Dict[str, str]],
+        temperature: float,
+        max_tokens: int,
+        json_mode: bool,
+        api_key: str
+    ) -> str:
+        """Call Google Gemini native generateContent API."""
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
+
+        system_instruction = ""
+        contents = []
+
+        for m in messages:
+            role = m.get("role", "user")
+            content = m.get("content", "")
+            if role == "system":
+                system_instruction += content + "\n"
+            elif role in ["assistant", "model"]:
+                contents.append({"role": "model", "parts": [{"text": content}]})
+            else:
+                contents.append({"role": "user", "parts": [{"text": content}]})
+
+        if not contents:
+            contents.append({"role": "user", "parts": [{"text": "Hello"}]})
+
+        payload: Dict[str, Any] = {
+            "contents": contents,
+            "generationConfig": {
+                "temperature": temperature,
+                "maxOutputTokens": max_tokens
+            }
+        }
+
+        if system_instruction.strip():
+            payload["system_instruction"] = {
+                "parts": [{"text": system_instruction.strip()}]
+            }
+
+        if json_mode:
+            payload["generationConfig"]["responseMimeType"] = "application/json"
+
+        async with httpx.AsyncClient(timeout=self.timeout) as client:
+            resp = await client.post(url, json=payload)
+            if resp.status_code != 200:
+                raise Exception(f"Gemini REST error {resp.status_code}: {resp.text}")
+            data = resp.json()
+            raw_text = data.get("candidates", [{}])[0].get("content", {}).get("parts", [{}])[0].get("text", "")
+            return self._clean_response(raw_text)
+
     async def call_llm(
         self,
         messages: List[Dict[str, str]],
@@ -59,18 +128,6 @@ class LLMService:
     ) -> str:
         """
         Call LLM with two-tier fallback using shared team API keys.
-
-        Args:
-            messages: OpenAI-format messages [{"role": "user", "content": "..."}]
-            temperature: Sampling temperature (0.0-1.0)
-            max_tokens: Maximum response tokens
-            json_mode: Force JSON response format
-
-        Returns:
-            LLM response text
-
-        Raises:
-            Exception: If all tiers fail or no API keys configured
         """
         primary_key = self._get_primary_key()
         secondary_key = self._get_secondary_key()
@@ -79,8 +136,8 @@ class LLMService:
         errors = []
 
         # Try Tier A (Primary - Groq)
-        if primary_key and not primary_key.startswith("your-"):
-            groq_models = ["openai/gpt-oss-120b", "openai/gpt-oss-20b", "qwen/qwen3.6-27b", "qwen/qwen3.8-27b", "groq/compound", self.primary_model]
+        if primary_key and not primary_key.startswith("your-") and AsyncOpenAI is not None:
+            groq_models = ["llama-3.3-70b-versatile", "llama-3.1-8b-instant", "mixtral-8x7b-32768", self.primary_model]
             primary_client = AsyncOpenAI(
                 base_url=self.primary_base_url,
                 api_key=primary_key
@@ -105,38 +162,31 @@ class LLMService:
                     error_msg = f"Groq ({m_name}) failed: {type(e).__name__}: {str(e)}"
                     logger.warning(f"⚠️ {error_msg}")
                     errors.append(error_msg)
-        else:
-            logger.info("ℹ️ Primary key not set, trying Secondary tier...")
 
-        # Try Tier B (Secondary - Gemini)
+        # Try Tier B (Secondary - Gemini Native REST)
         if secondary_key and not secondary_key.startswith("your-"):
-            gemini_models = [self.secondary_model, "gemini-3.6-flash", "gemini-3.7-flash", "gemini-flash-latest", "gemini-2.5-flash"]
-            secondary_client = AsyncOpenAI(
-                base_url=self.secondary_base_url,
-                api_key=secondary_key
-            )
+            gemini_models = [self.secondary_model, "gemini-3.5-flash", "gemini-3.6-flash", "gemini-3.7-flash", "gemini-flash-latest", "gemini-3.5-flash-lite", "gemini-pro-latest"]
             for g_model in dict.fromkeys(gemini_models):
                 if not g_model:
                     continue
                 try:
-                    logger.info(f"🔄 Attempting SECONDARY tier (Gemini: {g_model})...")
-                    response = await self._call_with_timeout(
-                        secondary_client,
+                    logger.info(f"🔄 Attempting SECONDARY tier (Gemini REST: {g_model})...")
+                    response = await self._call_gemini_native(
                         g_model,
                         messages,
                         temperature,
                         max_tokens,
-                        json_mode
+                        json_mode,
+                        secondary_key
                     )
-                    self.last_tier_used = "secondary"
-                    logger.info(f"✅ SECONDARY tier successful with {g_model} ({len(response)} chars)")
-                    return response
+                    if response:
+                        self.last_tier_used = "secondary"
+                        logger.info(f"✅ SECONDARY tier successful with {g_model} ({len(response)} chars)")
+                        return response
                 except Exception as e:
-                    error_msg = f"Gemini ({g_model}) failed: {type(e).__name__}: {str(e)}"
+                    error_msg = f"Gemini REST ({g_model}) failed: {type(e).__name__}: {str(e)}"
                     logger.warning(f"⚠️ {error_msg}")
                     errors.append(error_msg)
-        else:
-            logger.warning("⚠️ Secondary key not configured")
 
         self.last_tier_used = "rule_based"
 
@@ -182,12 +232,7 @@ class LLMService:
         )
 
         raw_content = response.choices[0].message.content or ""
-        import re
-        clean_content = re.sub(r'<think>[\s\S]*?</think>', '', raw_content, flags=re.IGNORECASE)
-        clean_content = re.sub(r'<think>[\s\S]*$', '', clean_content, flags=re.IGNORECASE)
-        clean_content = re.sub(r'\[think(?:ing)?\][\s\S]*?\[\/think(?:ing)?\]', '', clean_content, flags=re.IGNORECASE)
-        clean_content = re.sub(r'\[think(?:ing)?\][\s\S]*$', '', clean_content, flags=re.IGNORECASE).strip()
-        return clean_content
+        return self._clean_response(raw_content)
 
     def get_tier_info(self) -> Dict[str, Any]:
         """Get information about configured tiers."""
