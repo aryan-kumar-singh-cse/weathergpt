@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-export function stripInternalThinking(text: string): string {
+function stripInternalThinking(text: string): string {
   if (!text) return "";
   return text
     .replace(/<think>[\s\S]*?<\/think>/gi, "")
