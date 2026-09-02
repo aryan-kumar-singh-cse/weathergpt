@@ -180,8 +180,8 @@ export default function Home() {
             occupation: preferences.occupation,
             language: activeLang,
             location: cityName,
-            lat: coords?.lat ?? globeCoords.lat,
-            lng: coords?.lng ?? globeCoords.lng,
+            lat: coords?.lat,
+            lng: coords?.lng,
           }),
         });
 

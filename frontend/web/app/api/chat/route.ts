@@ -531,13 +531,17 @@ function extractTargetCityIfSpecified(query: string): string | null {
     }
   }
 
+  // If query is generic (e.g. "current location update", "weather update", "how is the weather", "current status"), do NOT treat as a city
+  if (/\b(current\s+location|my\s+location|here|my\s+city|my\s+area|this\s+place|current\s+weather|weather\s+update|location\s+update|latest\s+update|give\s+me\s+update|status\s+update|today'?s?\s+update|current\s+conditions?|today'?s?\s+weather|my\s+current\s+location)\b/i.test(qLower)) {
+    return null;
+  }
+
   // 2. Pattern-based extraction with clean candidate normalization
   const patterns = [
     /(?:weather|temp|temperature|climate|forecast|rain|conditions?|air\s+quality|aqi|nowcast)\s+(?:in|at|for|of|around|near)\s+([A-Za-z\s]+?)(?:\?|\.|$|\s+(?:today|now|tomorrow|tonight|this\s+week|specifically|right\s+now|please))/i,
     /(?:is\s+it\s+(?:raining|cold|hot|warm|sunny|cloudy|snowing|humid|dry)\s+in)\s+([A-Za-z\s]+?)(?:\?|\.|$|\s+(?:today|now|tomorrow|tonight))/i,
     /(?:how\s+(?:is|about)\s+(?:the\s+weather\s+in\s+)?)\s*([A-Za-z\s]+?)(?:\?|\.|$|\s+(?:today|now|tomorrow|tonight|doing))/i,
     /(?:what\s+about\s+(?:in\s+)?)\s*([A-Za-z\s]+?)(?:\?|\.|$|\s+(?:today|now|tomorrow|tonight))/i,
-    /^([A-Za-z\s]{2,30})\s+(?:weather|temp|temperature|climate|forecast|rain|rainfall|aqi|nowcast)(?:\?|\.|$|\s+(?:today|now|tomorrow|tonight))/i,
     /(?:tell\s+me\s+about\s+(?:the\s+weather\s+in\s+)?)\s*([A-Za-z\s]+?)(?:\?|\.|$|\s+(?:today|now|tomorrow|tonight))/i,
   ];
 
@@ -545,19 +549,10 @@ function extractTargetCityIfSpecified(query: string): string | null {
     const m = query.match(pat);
     if (m && m[1]) {
       let candidate = m[1].trim();
-      candidate = candidate.replace(/\b(weather|forecast|temperature|temp|climate|conditions|rain|nowcast|aqi|today|now|tomorrow|tonight|city|district|state|area)\b/gi, "").trim();
-      if (candidate.length >= 2 && !NON_LOCATION_STOPWORDS.has(candidate.toLowerCase())) {
+      candidate = candidate.replace(/\b(weather|forecast|temperature|temp|climate|conditions|rain|nowcast|aqi|today|now|tomorrow|tonight|city|district|state|area|update|report|status)\b/gi, "").trim();
+      if (candidate.length >= 3 && !NON_LOCATION_STOPWORDS.has(candidate.toLowerCase())) {
         return candidate.charAt(0).toUpperCase() + candidate.slice(1);
       }
-    }
-  }
-
-  // 3. Short query fallback (e.g. "Tokyo", "London", "Shimla")
-  const words = qLower.split(/\s+/).filter(Boolean);
-  if (words.length <= 3 && !/^(hi|hello|hey|thanks|thank\s+you|help|who\s+are\s+you|what\s+can\s+you\s+do|bye|good\s+morning)$/i.test(qLower)) {
-    const cleanQuery = qLower.replace(/[^\w\s]/g, "").trim();
-    if (cleanQuery && !NON_LOCATION_STOPWORDS.has(cleanQuery)) {
-      return cleanQuery.charAt(0).toUpperCase() + cleanQuery.slice(1);
     }
   }
 
@@ -1027,6 +1022,7 @@ const KNOWN_EXACT_PLACES: Record<string, { name: string; lat: number; lng: numbe
   ahmedabad: { name: "Ahmedabad, Gujarat", lat: 23.0225, lng: 72.5714 },
   surat: { name: "Surat, Gujarat", lat: 21.1702, lng: 72.8311 },
   vadodara: { name: "Vadodara, Gujarat", lat: 22.3072, lng: 73.1812 },
+  vadodra: { name: "Vadodara, Gujarat", lat: 22.3072, lng: 73.1812 },
   rajkot: { name: "Rajkot, Gujarat", lat: 22.3039, lng: 70.8022 },
   gandhinagar: { name: "Gandhinagar, Gujarat", lat: 23.2156, lng: 72.6369 },
   bhavnagar: { name: "Bhavnagar, Gujarat", lat: 21.7645, lng: 72.1519 },
@@ -1244,21 +1240,22 @@ export async function POST(request: Request) {
 
     // 2. If no explicit place in query, dynamically use the active searched dashboard location or real GPS
     if (resolvedLat === undefined || resolvedLng === undefined) {
-      const effectiveLat = userLat !== undefined && userLat !== null ? parseFloat(userLat) : (dashboardLat !== undefined && dashboardLat !== null ? parseFloat(dashboardLat) : (clientLat !== undefined && clientLat !== null ? parseFloat(clientLat) : undefined));
-      const effectiveLng = userLng !== undefined && userLng !== null ? parseFloat(userLng) : (dashboardLng !== undefined && dashboardLng !== null ? parseFloat(dashboardLng) : (clientLng !== undefined && clientLng !== null ? parseFloat(clientLng) : undefined));
+      const activeLoc = dashboardLocation || userLocation || location || "";
+      const cleanLoc = activeLoc.toLowerCase().split(",")[0].trim();
 
-      if (effectiveLat !== undefined && effectiveLng !== undefined && !isNaN(effectiveLat) && !isNaN(effectiveLng)) {
-        resolvedLat = effectiveLat;
-        resolvedLng = effectiveLng;
-        baseLocation = userLocation || dashboardLocation || location || "Selected Location";
-      } else if (dashboardLocation || userLocation || location) {
-        const rawLoc = dashboardLocation || userLocation || location;
-        const cleanLoc = rawLoc.toLowerCase().split(",")[0].trim();
-        if (KNOWN_EXACT_PLACES[cleanLoc]) {
-          resolvedLat = KNOWN_EXACT_PLACES[cleanLoc].lat;
-          resolvedLng = KNOWN_EXACT_PLACES[cleanLoc].lng;
-          baseLocation = KNOWN_EXACT_PLACES[cleanLoc].name;
-        } else {
+      if (cleanLoc && KNOWN_EXACT_PLACES[cleanLoc]) {
+        resolvedLat = KNOWN_EXACT_PLACES[cleanLoc].lat;
+        resolvedLng = KNOWN_EXACT_PLACES[cleanLoc].lng;
+        baseLocation = KNOWN_EXACT_PLACES[cleanLoc].name;
+      } else {
+        const effectiveLat = dashboardLat !== undefined && dashboardLat !== null ? parseFloat(dashboardLat) : (userLat !== undefined && userLat !== null ? parseFloat(userLat) : (clientLat !== undefined && clientLat !== null ? parseFloat(clientLat) : undefined));
+        const effectiveLng = dashboardLng !== undefined && dashboardLng !== null ? parseFloat(dashboardLng) : (userLng !== undefined && userLng !== null ? parseFloat(userLng) : (clientLng !== undefined && clientLng !== null ? parseFloat(clientLng) : undefined));
+
+        if (effectiveLat !== undefined && effectiveLng !== undefined && !isNaN(effectiveLat) && !isNaN(effectiveLng)) {
+          resolvedLat = effectiveLat;
+          resolvedLng = effectiveLng;
+          baseLocation = activeLoc || "Selected Location";
+        } else if (cleanLoc) {
           try {
             const geoRes = await fetch(
               `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(cleanLoc)}&count=1&language=en&format=json`
