@@ -1191,6 +1191,9 @@ export async function POST(request: Request) {
       userLocation,
       userLat,
       userLng,
+      dashboardLocation,
+      dashboardLat,
+      dashboardLng,
       location,
       history,
       lat: clientLat,
@@ -1209,7 +1212,7 @@ export async function POST(request: Request) {
     let isUnknownPlace = false;
     let unknownPlaceName = "";
 
-    // 1. Check if user specified a specific target city in the query (e.g. "Tokyo", "weather in Varanasi", "Paris forecast")
+    // 1. Check if user specified an explicit target city in the chat query (e.g. "Patna", "Shimla", "Kolkata", "Tokyo", etc.)
     const explicitTargetCity = extractTargetCityIfSpecified(message || "");
 
     if (explicitTargetCity) {
@@ -1228,7 +1231,7 @@ export async function POST(request: Request) {
             if (geoData.results && geoData.results.length > 0) {
               resolvedLat = geoData.results[0].latitude;
               resolvedLng = geoData.results[0].longitude;
-              baseLocation = `${geoData.results[0].name}, ${geoData.results[0].admin1 || geoData.results[0].country || "Region"}`;
+              baseLocation = `${geoData.results[0].name}, ${geoData.results[0].admin1 || geoData.results[0].country || "India"}`;
             } else {
               isUnknownPlace = true;
               unknownPlaceName = explicitTargetCity;
@@ -1238,20 +1241,43 @@ export async function POST(request: Request) {
       }
     }
 
-    // 2. If no explicit place in query, use the user's real GPS location (independent of dashboard search)
+    // 2. If no explicit place in query, dynamically use the active searched dashboard location or real GPS
     if (resolvedLat === undefined || resolvedLng === undefined) {
-      const realLat = userLat !== undefined && userLat !== null ? parseFloat(userLat) : (clientLat !== undefined && clientLat !== null ? parseFloat(clientLat) : undefined);
-      const realLng = userLng !== undefined && userLng !== null ? parseFloat(userLng) : (clientLng !== undefined && clientLng !== null ? parseFloat(clientLng) : undefined);
+      const effectiveLat = userLat !== undefined && userLat !== null ? parseFloat(userLat) : (dashboardLat !== undefined && dashboardLat !== null ? parseFloat(dashboardLat) : (clientLat !== undefined && clientLat !== null ? parseFloat(clientLat) : undefined));
+      const effectiveLng = userLng !== undefined && userLng !== null ? parseFloat(userLng) : (dashboardLng !== undefined && dashboardLng !== null ? parseFloat(dashboardLng) : (clientLng !== undefined && clientLng !== null ? parseFloat(clientLng) : undefined));
 
-      if (realLat !== undefined && realLng !== undefined && !isNaN(realLat) && !isNaN(realLng)) {
-        resolvedLat = realLat;
-        resolvedLng = realLng;
-        baseLocation = userLocation || location || "Your Real-Time Location";
-      } else {
-        // Fallback default: Modinagar, Uttar Pradesh (verified NCR coordinates)
-        resolvedLat = 28.7695;
-        resolvedLng = 77.5750;
-        baseLocation = "Modinagar, Uttar Pradesh";
+      if (effectiveLat !== undefined && effectiveLng !== undefined && !isNaN(effectiveLat) && !isNaN(effectiveLng)) {
+        resolvedLat = effectiveLat;
+        resolvedLng = effectiveLng;
+        baseLocation = userLocation || dashboardLocation || location || "Selected Location";
+      } else if (dashboardLocation || userLocation || location) {
+        const rawLoc = dashboardLocation || userLocation || location;
+        const cleanLoc = rawLoc.toLowerCase().split(",")[0].trim();
+        if (KNOWN_EXACT_PLACES[cleanLoc]) {
+          resolvedLat = KNOWN_EXACT_PLACES[cleanLoc].lat;
+          resolvedLng = KNOWN_EXACT_PLACES[cleanLoc].lng;
+          baseLocation = KNOWN_EXACT_PLACES[cleanLoc].name;
+        } else {
+          try {
+            const geoRes = await fetch(
+              `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(cleanLoc)}&count=1&language=en&format=json`
+            );
+            if (geoRes.ok) {
+              const geoData = await geoRes.json();
+              if (geoData.results && geoData.results.length > 0) {
+                resolvedLat = geoData.results[0].latitude;
+                resolvedLng = geoData.results[0].longitude;
+                baseLocation = `${geoData.results[0].name}, ${geoData.results[0].admin1 || geoData.results[0].country || "India"}`;
+              }
+            }
+          } catch {}
+        }
+      }
+
+      if (resolvedLat === undefined || resolvedLng === undefined) {
+        resolvedLat = 28.6139;
+        resolvedLng = 77.2090;
+        baseLocation = "New Delhi, Delhi";
       }
     }
 
@@ -1424,8 +1450,9 @@ ${isUnknownPlace ? `\n⚠️ UNVERIFIED LOCATION ALERT: User queried "${unknownP
       ...astroEnv,
     });
   } catch (error) {
+    const fallbackCity = "your requested location";
     return NextResponse.json({
-      city: "Modinagar, Ghaziabad",
+      city: fallbackCity,
       temp: 30.0,
       feelsLike: 32.0,
       maxTemp: 34.0,
@@ -1436,8 +1463,8 @@ ${isUnknownPlace ? `\n⚠️ UNVERIFIED LOCATION ALERT: User queried "${unknownP
       condition: "Partly Cloudy",
       rainChance: 20,
       weatherType: "cloudy",
-      lat: 28.7695,
-      lng: 77.5750,
+      lat: 28.6139,
+      lng: 77.2090,
       updatedAt: "12:00 PM",
       nowcastSlots: [
         { time: "12:00", temp: 30, condition: "Partly Cloudy", humidity: 55, rainChance: 20 },
@@ -1445,7 +1472,7 @@ ${isUnknownPlace ? `\n⚠️ UNVERIFIED LOCATION ALERT: User queried "${unknownP
         { time: "18:00", temp: 29, condition: "Partly Cloudy", humidity: 62, rainChance: 25 },
         { time: "21:00", temp: 26, condition: "Clear Sky", humidity: 70, rainChance: 10 },
       ],
-      response: "Currently in **Modinagar, Ghaziabad**, the weather is **Partly Cloudy** at **30°C** with **60%** humidity and **20%** rain chance.",
+      response: "Currently, the weather is **Partly Cloudy** at **30°C** with **60%** humidity and **20%** rain chance.",
       forecast: [],
       aqi: 110,
       aqiCategory: "Moderate",
