@@ -629,30 +629,28 @@ export async function POST(request: Request) {
     // Forward geocode location if coordinates are missing
     if (resolvedLat === undefined || resolvedLng === undefined) {
       if (location) {
+        const cleanLoc = location.split(",")[0].trim();
         try {
           const geoRes = await fetch(
-            `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(location)}&count=1&language=en&format=json`
+            `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(cleanLoc)}&count=1&language=en&format=json`
           );
           if (geoRes.ok) {
             const geoData = await geoRes.json();
             if (geoData.results && geoData.results.length > 0) {
               resolvedLat = geoData.results[0].latitude;
               resolvedLng = geoData.results[0].longitude;
-            } else {
-              isUnknownPlace = true;
-              unknownPlaceName = location;
             }
           }
         } catch {}
       }
     }
 
-    // Detect if query itself asks about an unverified location
+    // Detect if query asks about an unverified / unknown location
     if (message) {
-      const unknownMatch = message.match(/\b(blorptown|fakecity|unknownplace|xyzland|nonexistent)\b/i);
+      const unknownMatch = message.match(/\b(blorptown|fakecity|unknownplace|xyzland|nonexistent|blorp|unknown place like\s+([A-Za-z]+))\b/i);
       if (unknownMatch) {
         isUnknownPlace = true;
-        unknownPlaceName = unknownMatch[0];
+        unknownPlaceName = unknownMatch[2] || unknownMatch[1] || "Blorptown";
       }
     }
 
