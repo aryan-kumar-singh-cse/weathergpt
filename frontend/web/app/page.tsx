@@ -283,7 +283,14 @@ export default function Home() {
     };
   }, [dashboardWeather.city, dashboardWeather.lat, dashboardWeather.lng, handleSelectDashboardLocation]);
 
-  // 2. Multi-Turn Conversational Chat Handler
+  // User's Real Detected GPS Location (Independent of dashboard searchbar)
+  const [userRealLocation, setUserRealLocation] = useState<{ city: string; lat?: number; lng?: number }>({
+    city: "My Location",
+    lat: undefined,
+    lng: undefined,
+  });
+
+  // 2. Multi-Turn Conversational Chat Handler (Independent of Dashboard Searchbar)
   const handleChatSend = useCallback(
     async (message: string, history?: ChatMessage[]) => {
       setIsChatLoading(true);
@@ -301,9 +308,9 @@ export default function Home() {
             message,
             occupation: preferences.occupation,
             language: selectedLanguage,
-            location: dashboardWeather.city || "Modinagar, Ghaziabad",
-            lat: dashboardWeather.lat,
-            lng: dashboardWeather.lng,
+            userLocation: userRealLocation.city,
+            userLat: userRealLocation.lat,
+            userLng: userRealLocation.lng,
             history: formattedHistory,
           }),
         });
@@ -314,24 +321,6 @@ export default function Home() {
         setChatResponse(data.response);
         setChatResponseCity(data.city);
 
-        // Dynamically rotate Earth to location mentioned in chat
-        if (data.lat && data.lng) {
-          setGlobeCoords({ lat: data.lat, lng: data.lng });
-          setDashboardWeather((prev) => ({
-            ...prev,
-            lat: data.lat,
-            lng: data.lng,
-            city: data.city || prev.city,
-            temp: data.temp ?? prev.temp,
-            feelsLike: data.feelsLike ?? prev.feelsLike,
-            condition: data.condition || prev.condition,
-            weatherType: data.weatherType || prev.weatherType,
-            rainChance: data.rainChance ?? prev.rainChance,
-            humidity: data.humidity ?? prev.humidity,
-            windSpeed: data.windSpeed ?? prev.windSpeed,
-          }));
-        }
-
         return data.response as string;
       } catch (err: any) {
         toast.error(err?.message || "Failed to process question");
@@ -340,7 +329,7 @@ export default function Home() {
         setIsChatLoading(false);
       }
     },
-    [preferences, selectedLanguage, dashboardWeather.city, dashboardWeather.lat, dashboardWeather.lng]
+    [preferences.occupation, selectedLanguage, userRealLocation]
   );
 
   // 3. Live GPS Geolocation Auto-Detection Trigger
@@ -361,8 +350,9 @@ export default function Home() {
         try {
           const { latitude, longitude } = pos.coords;
           const geo = await reverseGeocode(latitude, longitude);
-          const detectedCity = geo.city || "Modinagar, Ghaziabad";
+          const detectedCity = geo.city || `${latitude.toFixed(2)}°N, ${longitude.toFixed(2)}°E`;
 
+          setUserRealLocation({ city: detectedCity, lat: latitude, lng: longitude });
           setPreferences((prev) => ({ ...prev, defaultLocation: detectedCity }));
           if (toastId) toast.success(`Located at ${detectedCity}`, { id: toastId });
 

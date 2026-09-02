@@ -802,12 +802,39 @@ CORE INSTRUCTIONS:
   return null;
 }
 
+const KNOWN_EXACT_PLACES: Record<string, { name: string; lat: number; lng: number }> = {
+  modinagar: { name: "Modinagar, Uttar Pradesh", lat: 28.7695, lng: 77.5750 },
+  "modīnagar": { name: "Modinagar, Uttar Pradesh", lat: 28.7695, lng: 77.5750 },
+  baghpat: { name: "Baghpat, Uttar Pradesh", lat: 28.9447, lng: 77.2244 },
+  bagpat: { name: "Baghpat, Uttar Pradesh", lat: 28.9447, lng: 77.2244 },
+  ghaziabad: { name: "Ghaziabad, Uttar Pradesh", lat: 28.6692, lng: 77.4538 },
+  meerut: { name: "Meerut, Uttar Pradesh", lat: 28.9845, lng: 77.7064 },
+  noida: { name: "Noida, Uttar Pradesh", lat: 28.5355, lng: 77.3910 },
+  "greater noida": { name: "Greater Noida, Uttar Pradesh", lat: 28.4744, lng: 77.5040 },
+  hapur: { name: "Hapur, Uttar Pradesh", lat: 28.7306, lng: 77.7759 },
+  delhi: { name: "New Delhi, Delhi", lat: 28.6139, lng: 77.2090 },
+  "new delhi": { name: "New Delhi, Delhi", lat: 28.6139, lng: 77.2090 },
+  mumbai: { name: "Mumbai, Maharashtra", lat: 19.0760, lng: 72.8777 },
+  bengaluru: { name: "Bengaluru, Karnataka", lat: 12.9716, lng: 77.5946 },
+  bangalore: { name: "Bengaluru, Karnataka", lat: 12.9716, lng: 77.5946 },
+  chennai: { name: "Chennai, Tamil Nadu", lat: 13.0827, lng: 80.2707 },
+  kolkata: { name: "Kolkata, West Bengal", lat: 22.5726, lng: 88.3639 },
+  hyderabad: { name: "Hyderabad, Telangana", lat: 17.3850, lng: 78.4867 },
+  pune: { name: "Pune, Maharashtra", lat: 18.5204, lng: 73.8567 },
+  jaipur: { name: "Jaipur, Rajasthan", lat: 26.9124, lng: 75.7873 },
+  lucknow: { name: "Lucknow, Uttar Pradesh", lat: 26.8467, lng: 80.9462 },
+  varanasi: { name: "Varanasi, Uttar Pradesh", lat: 25.3176, lng: 82.9739 },
+};
+
 export async function POST(request: Request) {
   try {
     const {
       message,
       occupation,
       language,
+      userLocation,
+      userLat,
+      userLng,
       location,
       history,
       lat: clientLat,
@@ -819,28 +846,26 @@ export async function POST(request: Request) {
     else if (occupation?.toLowerCase().includes("pilot")) role = "pilot";
     else if (occupation?.toLowerCase().includes("disaster")) role = "disaster-manager";
 
-    let resolvedLat = clientLat !== undefined && clientLat !== null ? parseFloat(clientLat) : undefined;
-    let resolvedLng = clientLng !== undefined && clientLng !== null ? parseFloat(clientLng) : undefined;
+    let resolvedLat: number | undefined = undefined;
+    let resolvedLng: number | undefined = undefined;
+    let baseLocation = "";
 
     let isUnknownPlace = false;
     let unknownPlaceName = "";
 
-    // Check if user specified a target city in the query (e.g. "Tokyo", "weather in Varanasi", "Paris forecast")
+    // 1. Check if user specified a specific target city in the query (e.g. "Tokyo", "weather in Varanasi", "Paris forecast")
     const explicitTargetCity = extractTargetCityIfSpecified(message || "");
-    let baseLocation = explicitTargetCity || location || "Modinagar, Ghaziabad";
 
     if (explicitTargetCity) {
-      resolvedLat = undefined;
-      resolvedLng = undefined;
-    }
-
-    // Geocode location if coordinates are missing or if a new target city was specified
-    if (resolvedLat === undefined || resolvedLng === undefined) {
-      if (baseLocation) {
-        const cleanLoc = baseLocation.split(",")[0].trim();
+      const cleanTarget = explicitTargetCity.toLowerCase().trim();
+      if (KNOWN_EXACT_PLACES[cleanTarget]) {
+        resolvedLat = KNOWN_EXACT_PLACES[cleanTarget].lat;
+        resolvedLng = KNOWN_EXACT_PLACES[cleanTarget].lng;
+        baseLocation = KNOWN_EXACT_PLACES[cleanTarget].name;
+      } else {
         try {
           const geoRes = await fetch(
-            `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(cleanLoc)}&count=1&language=en&format=json`
+            `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(explicitTargetCity)}&count=1&language=en&format=json`
           );
           if (geoRes.ok) {
             const geoData = await geoRes.json();
@@ -848,12 +873,29 @@ export async function POST(request: Request) {
               resolvedLat = geoData.results[0].latitude;
               resolvedLng = geoData.results[0].longitude;
               baseLocation = `${geoData.results[0].name}, ${geoData.results[0].admin1 || geoData.results[0].country || "Region"}`;
-            } else if (explicitTargetCity) {
+            } else {
               isUnknownPlace = true;
               unknownPlaceName = explicitTargetCity;
             }
           }
         } catch {}
+      }
+    }
+
+    // 2. If no explicit place in query, use the user's real GPS location (independent of dashboard search)
+    if (resolvedLat === undefined || resolvedLng === undefined) {
+      const realLat = userLat !== undefined && userLat !== null ? parseFloat(userLat) : (clientLat !== undefined && clientLat !== null ? parseFloat(clientLat) : undefined);
+      const realLng = userLng !== undefined && userLng !== null ? parseFloat(userLng) : (clientLng !== undefined && clientLng !== null ? parseFloat(clientLng) : undefined);
+
+      if (realLat !== undefined && realLng !== undefined && !isNaN(realLat) && !isNaN(realLng)) {
+        resolvedLat = realLat;
+        resolvedLng = realLng;
+        baseLocation = userLocation || location || "Your Real-Time Location";
+      } else {
+        // Fallback default: Modinagar, Uttar Pradesh (verified NCR coordinates)
+        resolvedLat = 28.7695;
+        resolvedLng = 77.5750;
+        baseLocation = "Modinagar, Uttar Pradesh";
       }
     }
 
@@ -864,13 +906,6 @@ export async function POST(request: Request) {
         isUnknownPlace = true;
         unknownPlaceName = unknownMatch[2] || unknownMatch[1] || "Blorptown";
       }
-    }
-
-    // Default coordinates: Modinagar, Ghaziabad (28.7695, 77.5750)
-    if (resolvedLat === undefined || resolvedLng === undefined) {
-      resolvedLat = 28.7695;
-      resolvedLng = 77.5750;
-      baseLocation = "Modinagar, Ghaziabad";
     }
 
     const currentCityName = baseLocation;
