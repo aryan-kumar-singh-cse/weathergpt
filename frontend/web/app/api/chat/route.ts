@@ -421,13 +421,24 @@ CURRENT REAL-TIME LOCATION & WEATHER TELEMETRY:
 ${weatherContext}
 
 USER ROLE: ${role}
-PREFERRED LANGUAGE: ${language}
+TARGET REGIONAL LANGUAGE: ${language}
 
 CORE INSTRUCTIONS:
 1. Always be smart, thoughtful, and directly answer the exact question asked without generic repetitive filler.
 2. If the user asks a random, creative, scientific, or general question, answer it intelligently, fluently, and warmly.
 3. When relevant to the user's inquiry, naturally weave in and reference the exact live metrics (${city}, temperature, humidity, rain chance, etc.).
-4. Use clean, elegant GitHub markdown formatting with **bold highlights** and bullet points when listing recommendations.`;
+4. Use clean, elegant GitHub markdown formatting with **bold highlights** and bullet points when listing recommendations.
+5. MULTILINGUAL REQUIREMENT: You MUST answer ENTIRELY in the target language (${language}).
+   - If 'hi', answer in natural, fluent Hindi (हिंदी में उत्तर दें).
+   - If 'mr', answer in natural, fluent Marathi (मराठीत उत्तर द्या).
+   - If 'ta', answer in natural, fluent Tamil (தமிழில் பதிலளிக்கவும்).
+   - If 'te', answer in natural, fluent Telugu (తెలుగులో సమాధానం ఇవ్వండి).
+   - If 'bn', answer in natural, fluent Bengali (বাংলায় উত্তর দিন).
+   - If 'gu', answer in natural, fluent Gujarati (ગુજરાતીમાં જવાબ આપો).
+   - If 'kn', answer in natural, fluent Kannada (ಕನ್ನಡದಲ್ಲಿ ಉತ್ತರಿಸಿ).
+   - If 'pa', answer in natural, fluent Punjabi (ਪੰਜਾਬੀ ਵਿੱਚ ਜਵਾਬ ਦਿਓ).
+   - If 'ml', answer in natural, fluent Malayalam (മലയാളത്തിൽ മറുപടി നൽകുക).
+   - If 'en', answer in English.`;
 
   const messages: any[] = [
     { role: "system", content: systemPrompt },

@@ -11,8 +11,11 @@ import {
   Smartphone,
   ChevronDown,
   ChevronUp,
+  Volume2,
+  VolumeX,
 } from "lucide-react";
-import { SupportedLanguage, TRANSLATIONS, translateCondition } from "@/lib/translations";
+import { SupportedLanguage, TRANSLATIONS, translateCondition, translateAqiCategory } from "@/lib/translations";
+import { speakText, stopSpeech } from "@/lib/tts";
 import SunMoonArcCard from "./SunMoonArcCard";
 import ImdNowcastBanner from "./ImdNowcastBanner";
 import NowcastSlider, { NowcastSlot } from "./NowcastSlider";
@@ -85,12 +88,34 @@ export default function WeatherSummaryCard({
   onOpenSms,
 }: Props) {
   const [isMinimized, setIsMinimized] = useState(false);
+  const [isSpeaking, setIsSpeaking] = useState(false);
 
   const t = TRANSLATIONS[lang] || TRANSLATIONS.en;
   const translatedCondition = translateCondition(condition, lang);
 
-  const resolvedAqiCategory = aqiCategory || (aqi <= 50 ? "Good" : aqi <= 100 ? "Satisfactory" : aqi <= 200 ? "Moderate" : aqi <= 300 ? "Poor" : "Severe");
+  const rawAqiCat = aqiCategory || (aqi <= 50 ? "Good" : aqi <= 100 ? "Satisfactory" : aqi <= 200 ? "Moderate" : aqi <= 300 ? "Poor" : "Severe");
+  const translatedAqiCat = translateAqiCategory(rawAqiCat, lang);
   const aqiBgColor = aqi <= 50 ? "bg-emerald-500 text-white" : aqi <= 100 ? "bg-green-500 text-black" : aqi <= 200 ? "bg-yellow-400 text-black font-bold" : "bg-red-500 text-white font-bold";
+
+  // Voice Readout of Weather Briefing in Selected Language
+  const handleToggleVoice = () => {
+    if (isSpeaking) {
+      stopSpeech();
+      setIsSpeaking(false);
+      return;
+    }
+
+    const speechText = `${city}. ${translatedCondition}. ${t.temperature}: ${temp.toFixed(1)}°C. ${t.feelsLike}: ${feelsLike?.toFixed(1)}°C. ${t.humidity}: ${humidity}%. ${t.airQuality}: ${aqi}, ${translatedAqiCat}. ${imdWarning ? imdWarning : ""}`;
+
+    setIsSpeaking(true);
+    speakText(
+      speechText,
+      lang,
+      () => setIsSpeaking(true),
+      () => setIsSpeaking(false),
+      () => setIsSpeaking(false)
+    );
+  };
 
   return (
     <div
@@ -98,7 +123,7 @@ export default function WeatherSummaryCard({
         isMinimized ? "w-52" : "w-84 md:w-96"
       } rounded-3xl bg-black/90 backdrop-blur-2xl border border-yellow-400/35 p-4 md:p-5 text-white shadow-2xl shadow-black/90 hover:border-yellow-400/50 animate-fade-in font-mono max-h-[88vh] overflow-y-auto no-scrollbar`}
     >
-      {/* Top Row: Location, GPS & Minimize Toggle */}
+      {/* Top Row: Location, GPS, Voice Readout & Minimize Toggle */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-1.5 overflow-hidden">
           <MapPin className="w-4 h-4 text-yellow-400 shrink-0" />
@@ -108,6 +133,22 @@ export default function WeatherSummaryCard({
         </div>
 
         <div className="flex items-center gap-1.5 shrink-0">
+          {/* TTS Listen Button */}
+          {!isMinimized && (
+            <button
+              onClick={handleToggleVoice}
+              title={isSpeaking ? t.stopAudio : t.listenAudio}
+              className={`p-1.5 rounded-lg border transition cursor-pointer flex items-center gap-1 text-[10px] ${
+                isSpeaking
+                  ? "bg-yellow-400 text-gray-950 border-yellow-400 font-bold animate-pulse"
+                  : "bg-yellow-400/15 hover:bg-yellow-400/25 border-yellow-400/40 text-yellow-300"
+              }`}
+            >
+              {isSpeaking ? <VolumeX className="w-3 h-3" /> : <Volume2 className="w-3 h-3" />}
+              <span>{isSpeaking ? t.stopAudio : t.listenAudio}</span>
+            </button>
+          )}
+
           {onRefreshGPS && !isMinimized && (
             <button
               onClick={onRefreshGPS}
@@ -122,7 +163,7 @@ export default function WeatherSummaryCard({
 
           <button
             onClick={() => setIsMinimized(!isMinimized)}
-            title={isMinimized ? "Expand card" : "Minimize card"}
+            title={isMinimized ? t.expand : t.minimize}
             className="p-1 rounded-lg text-gray-400 hover:text-white hover:bg-white/10 transition cursor-pointer"
           >
             {isMinimized ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronUp className="w-3.5 h-3.5" />}
@@ -130,14 +171,17 @@ export default function WeatherSummaryCard({
         </div>
       </div>
 
-      {/* Main Temperature (0.1 Decimal Precision) */}
+      {/* Main Temperature & Condition */}
       <div className="mt-2 flex items-baseline justify-between">
         <div>
           <p className="text-3xl md:text-4xl font-extrabold tracking-tight text-white">
             {temp.toFixed(1)}°<span className="text-xl font-normal text-yellow-400">C</span>
           </p>
-          <span className="text-[10px] text-gray-400 block -mt-0.5">
-            Updated At {updatedAt}
+          <p className="text-xs font-semibold text-yellow-300 mt-0.5">
+            {translatedCondition}
+          </p>
+          <span className="text-[10px] text-gray-400 block mt-0.5">
+            {updatedAt}
           </span>
         </div>
 
@@ -152,13 +196,13 @@ export default function WeatherSummaryCard({
         <div className="mt-1.5 space-y-0.5 text-xs text-gray-300">
           {feelsLike !== undefined && (
             <p className="text-[11px] text-gray-300">
-              {t.feelsLike} <span className="font-bold text-yellow-400">{feelsLike.toFixed(1)}°C</span>
+              {t.feelsLike}: <span className="font-bold text-yellow-400">{feelsLike.toFixed(1)}°C</span>
             </p>
           )}
           <div className="flex items-center gap-3 text-[11px] text-gray-400">
-            <span>Max <strong className="text-white">{maxTemp.toFixed(1)}°C</strong></span>
+            <span>{t.high}: <strong className="text-white">{maxTemp.toFixed(1)}°C</strong></span>
             <span>•</span>
-            <span>Min <strong className="text-white">{minTemp.toFixed(1)}°C</strong></span>
+            <span>{t.low}: <strong className="text-white">{minTemp.toFixed(1)}°C</strong></span>
             <span>•</span>
             <span>💧 <strong className="text-sky-300">{humidity}%</strong></span>
           </div>
@@ -171,16 +215,16 @@ export default function WeatherSummaryCard({
           <div className="flex items-center gap-2">
             <span className="text-xs font-bold text-white">AQI {aqi}</span>
             <span className={`text-[10px] px-2 py-0.5 rounded-lg ${aqiBgColor}`}>
-              {resolvedAqiCategory}
+              {translatedAqiCat}
             </span>
           </div>
           <span className="text-[8px] text-gray-400 uppercase tracking-wider font-mono">
-            National AQI - Source CPCB
+            {t.airQuality}
           </span>
         </div>
       )}
 
-      {/* 3-Hourly Nowcasting Slider (Matching Screenshot 1) */}
+      {/* 3-Hourly Nowcasting Slider */}
       {!isMinimized && (
         <NowcastSlider slots={nowcastSlots} />
       )}
@@ -210,7 +254,7 @@ export default function WeatherSummaryCard({
         <div className="mt-3 pt-2.5 border-t border-white/10 grid grid-cols-5 gap-1 text-center">
           <button
             onClick={onOpenLightning}
-            title="IITM / IMD DAMINI Lightning Strike Sensor"
+            title={t.lightningAnalyzer}
             className="p-1.5 rounded-xl bg-gray-950/80 hover:bg-yellow-400/20 border border-white/10 hover:border-yellow-400/40 text-yellow-400 flex flex-col items-center gap-0.5 transition cursor-pointer"
           >
             <Zap className="w-3.5 h-3.5" />
@@ -219,7 +263,7 @@ export default function WeatherSummaryCard({
 
           <button
             onClick={onOpenCropGDD}
-            title="Krishi Vigyan Kendra Crop Phenology & GDD Engine"
+            title={t.cropGdd}
             className="p-1.5 rounded-xl bg-gray-950/80 hover:bg-yellow-400/20 border border-white/10 hover:border-yellow-400/40 text-emerald-400 flex flex-col items-center gap-0.5 transition cursor-pointer"
           >
             <Sprout className="w-3.5 h-3.5" />
@@ -228,7 +272,7 @@ export default function WeatherSummaryCard({
 
           <button
             onClick={onOpenSatellite}
-            title="ISRO INSAT-3DR Geostationary Satellite Imagery"
+            title={t.satelliteInsat}
             className="p-1.5 rounded-xl bg-gray-950/80 hover:bg-yellow-400/20 border border-white/10 hover:border-yellow-400/40 text-cyan-400 flex flex-col items-center gap-0.5 transition cursor-pointer"
           >
             <Satellite className="w-3.5 h-3.5" />
@@ -237,7 +281,7 @@ export default function WeatherSummaryCard({
 
           <button
             onClick={onOpenDisaster}
-            title="NDMA Disaster & Relief Camp Hub"
+            title={t.disasterHub}
             className="p-1.5 rounded-xl bg-gray-950/80 hover:bg-yellow-400/20 border border-white/10 hover:border-yellow-400/40 text-red-400 flex flex-col items-center gap-0.5 transition cursor-pointer"
           >
             <ShieldAlert className="w-3.5 h-3.5" />
@@ -246,7 +290,7 @@ export default function WeatherSummaryCard({
 
           <button
             onClick={onOpenSms}
-            title="Rural 2G/3G SMS Broadcast Simulator"
+            title={t.ruralSms}
             className="p-1.5 rounded-xl bg-gray-950/80 hover:bg-yellow-400/20 border border-white/10 hover:border-yellow-400/40 text-yellow-300 flex flex-col items-center gap-0.5 transition cursor-pointer"
           >
             <Smartphone className="w-3.5 h-3.5" />

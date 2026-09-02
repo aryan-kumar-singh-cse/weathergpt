@@ -11,6 +11,7 @@ import {
   X,
 } from "lucide-react";
 import TemperatureRangeBar from "./TemperatureRangeBar";
+import { SupportedLanguage, TRANSLATIONS, translateCondition } from "@/lib/translations";
 
 export type DetailedDay = {
   date: number | string;
@@ -30,6 +31,7 @@ type Props = {
   city: string;
   days7: DetailedDay[];
   days15: DetailedDay[];
+  lang?: SupportedLanguage;
 };
 
 function renderWeatherIcon(condition: string) {
@@ -80,11 +82,13 @@ export default function DetailedForecastPanel({
   city,
   days7,
   days15,
+  lang = "en",
 }: Props) {
   const [tab, setTab] = useState<"7day" | "15day">("7day");
 
   if (!isOpen) return null;
 
+  const t = TRANSLATIONS[lang] || TRANSLATIONS.en;
   const valid7Days = ensureDayCount(days7, 7);
   const valid15Days = ensureDayCount(days15.length > 0 ? days15 : days7, 15);
   const currentDays = tab === "7day" ? valid7Days : valid15Days;
@@ -111,12 +115,12 @@ export default function DetailedForecastPanel({
           <div>
             <div className="flex items-center gap-2">
               <h2 className="text-base md:text-lg font-bold text-white tracking-tight">
-                Extended Outlook
+                {t.detailedForecast}
               </h2>
               <span className="text-xs text-yellow-400 font-bold">• {city}</span>
             </div>
             <p className="text-[11px] text-gray-400">
-              IMD Synoptic range bars & precipitation probabilities
+              {tab === "7day" ? t.forecast7Day : t.forecast15Day}
             </p>
           </div>
         </div>
@@ -156,11 +160,12 @@ export default function DetailedForecastPanel({
         </div>
       </div>
 
-      {/* List of forecast rows with Horizontal Gradient Bars (Matching Screenshot #2) */}
+      {/* List of forecast rows with Horizontal Gradient Bars */}
       <div className="p-4 md:p-6 max-h-[460px] overflow-y-auto space-y-2.5">
         {currentDays.map((d, index) => {
           const min = d.lowTemp ?? d.highTemp - 5;
           const max = d.highTemp;
+          const translatedCond = translateCondition(d.condition, lang);
 
           return (
             <div
@@ -174,10 +179,10 @@ export default function DetailedForecastPanel({
               </div>
 
               {/* Weather Icon & Condition */}
-              <div className="w-36 flex items-center gap-2 shrink-0">
+              <div className="w-44 flex items-center gap-2 shrink-0">
                 {renderWeatherIcon(d.condition)}
                 <span className="text-xs text-gray-200 capitalize truncate">
-                  {d.condition || "Clear"}
+                  {translatedCond}
                 </span>
               </div>
 

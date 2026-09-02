@@ -69,7 +69,7 @@ export default function InfoStrip({
             title="Open ISRO Satellite & Doppler Radar Overview"
             className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-yellow-400/10 hover:bg-yellow-400/20 border border-yellow-400/40 text-xs font-bold text-yellow-300 transition cursor-pointer"
           >
-            <span>🗺️ Map</span>
+            <span>🗺️ {t.radar}</span>
           </button>
         </>
       )}

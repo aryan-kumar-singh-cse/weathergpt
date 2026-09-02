@@ -25,6 +25,8 @@ import {
   Calendar,
 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
+import { SupportedLanguage, TRANSLATIONS, translateRole } from "@/lib/translations";
+import { speakText, stopSpeech, LANGUAGE_LOCALE_MAP } from "@/lib/tts";
 
 export type ChatMessage = {
   id: string;
@@ -45,40 +47,170 @@ type Props = {
   isExpanded?: boolean;
   onToggleExpanded?: (expanded: boolean) => void;
   onSwitchDashboardCity?: (city: string) => void;
+  lang?: SupportedLanguage;
 };
 
-function getRoleBasedPrompts(role: string): string[] {
+function getRoleBasedPrompts(role: string, lang: SupportedLanguage = "en"): string[] {
   const r = (role || "").toLowerCase();
-  if (r.includes("farmer")) {
-    return [
-      "Next 5 days rainfall & soil moisture",
-      "Is it safe to spray pesticides tomorrow?",
-      "Irrigation scheduling & dry spell forecast",
-      "Temperature risk for sowing crops",
-    ];
-  }
-  if (r.includes("pilot")) {
-    return [
-      "Wind shear, turbulence & cloud ceiling",
-      "Aviation visibility & crosswind runway status",
-      "Thunderstorm & icing alert along flight paths",
-      "METAR & pressure altimeter briefing",
-    ];
-  }
-  if (r.includes("disaster")) {
-    return [
-      "Flash flood & inundation risk analysis",
-      "Cyclone path, wind speed & surge alert",
-      "Heavy rainfall danger zones",
-      "Emergency evacuation advisory",
-    ];
-  }
-  return [
-    "Will it rain in the next 3 hours?",
-    "Hourly temperature & humidity trend",
-    "Should I carry an umbrella today?",
-    "Compare weather with London",
-  ];
+
+  const prompts: Record<string, Record<string, string[]>> = {
+    farmer: {
+      en: [
+        "Next 5 days rainfall & soil moisture",
+        "Is it safe to spray pesticides tomorrow?",
+        "Irrigation scheduling & dry spell forecast",
+        "Temperature risk for sowing crops",
+      ],
+      hi: [
+        "अगले 5 दिनों की वर्षा और मिट्टी में नमी",
+        "क्या कल कीटनाशक का छिड़काव करना सुरक्षित है?",
+        "सिंचाई का समय और सूखे का पूर्वानुमान",
+        "फसल बुवाई के लिए तापमान जोखिम",
+      ],
+      mr: [
+        "पुढील ५ दिवसांचा पाऊस व जमिनीतील ओलावा",
+        "उद्या कीटकनाशक फवारणी करणे सुरक्षित आहे का?",
+        "पाणी देण्याचे नियोजन व पावसाचा अंदाज",
+        "पेरणीसाठी योग्य तापमान सल्ला",
+      ],
+      ta: [
+        "அடுத்த 5 நாட்கள் மழை மற்றும் மண் ஈரப்பதம்",
+        "நாளை பூச்சிக்கொல்லி தெளிப்பது பாதுகாப்பானதா?",
+        "பாசன அட்டவணை மற்றும் உலர் கால முன்னறிவிப்பு",
+        "விதைப்புக்கான வெப்பநிலை ஆபத்து",
+      ],
+      te: [
+        "రాబోయే 5 రోజుల వర్షపాతం & నేల తేమ",
+        "రేపు పురుగుమందులు పిచಿಕారీ చేయడం సురక్షితమేనా?",
+        "నీటి పారుదల ప్రణాళిక & వర్ష సూచన",
+        "విత్తనాలు నాటడానికి ఉష్ణోగ్రత ప్రమాదం",
+      ],
+      bn: [
+        "আগামী ৫ দিনের বৃষ্টিপাত ও মাটির আর্দ্রতা",
+        "কাল কি কীটনাশক স্প্রে করা নিরাপদ?",
+        "সেচের সময়সূচী ও খরা পূর্বাভাস",
+        "বীজ বোনার জন্য তাপমাত্রার ঝুঁকি",
+      ],
+      gu: [
+        "આગામી ૫ દિવસનો વરસાદ અને જમીનનો ભેજ",
+        "શું કાલે જંતુનાશક દવા છાંટવી સુરક્ષિત છે?",
+        "પિયતનું આયોજન અને વરસાદની આગાહી",
+        "વાવણી માટે તાપમાનનું જોખમ",
+      ],
+      kn: [
+        "ಮುಂದಿನ ೫ ದಿನಗಳ ಮಳೆ ಮತ್ತು ಮಣ್ಣಿನ ತೇವಾಂಶ",
+        "ನಾಳೆ ಕೀಟನಾಶಕ ಸಿಂಪಡಿಸುವುದು ಸುರಕ್ಷಿತವೇ?",
+        "ನೀರಾವರಿ ವೇಳಾಪಟ್ಟಿ ಮತ್ತು ಮಳೆ ಮುನ್ಸೂಚನೆ",
+        "ಬಿತ್ತನೆಗೆ ತಾಪಮಾನದ ಅಪಾಯ",
+      ],
+      pa: [
+        "ਅਗਲੇ ੫ ਦਿਨਾਂ ਦੀ ਬਾਰਸ਼ ਅਤੇ ਜ਼ਮੀਨ ਦੀ ਨਮੀ",
+        "ਕੀ ਕੱਲ੍ਹ ਕੀਟਨਾਸ਼ਕ ਸਪਰੇਅ ਕਰਨਾ ਸੁਰੱਖਿਅਤ ਹੈ?",
+        "ਸਿੰਚਾਈ ਦਾ ਸਮਾਂ ਅਤੇ ਮੌਸਮ ਦਾ ਅਨੁਮਾਨ",
+        "ਬਿਜਾਈ ਲਈ ਤਾਪਮਾਨ ਦਾ ਖ਼ਤਰਾ",
+      ],
+      ml: [
+        "അടുത്ത 5 ദിവസത്തെ മഴയും മണ്ണിന്റെ ഈർപ്പവും",
+        "നാളെ കീടനാശിനി തളിക്കുന്നത് സുരക്ഷിതമാണോ?",
+        "നനയ്ക്കൽ സമയക്രമവും വരൾച്ചാ പ്രവചനവും",
+        "വിത്ത് വിതയ്ക്കുന്നതിനുള്ള താപനില അപകടസാധ്യത",
+      ],
+    },
+    pilot: {
+      en: [
+        "Wind shear, turbulence & cloud ceiling",
+        "Aviation visibility & crosswind runway status",
+        "Thunderstorm & icing alert along flight paths",
+        "METAR & pressure altimeter briefing",
+      ],
+      hi: [
+        "हवा का बहाव, टर्बुलेंस और बादलों की ऊंचाई",
+        "विमानन दृश्यता और रनवे क्रॉसविंड स्थिति",
+        "उड़ान मार्ग पर आंधी व बर्फबारी चेतावनी",
+        "METAR व बैरोमीटर दबाव ब्रीफिंग",
+      ],
+    },
+    disaster: {
+      en: [
+        "Flash flood & inundation risk analysis",
+        "Cyclone path, wind speed & surge alert",
+        "Heavy rainfall danger zones",
+        "Emergency evacuation advisory",
+      ],
+      hi: [
+        "अचानक बाढ़ और जलभराव का जोखिम विश्लेषण",
+        "चक्रवात मार्ग, हवा की गति व तूफानी लहरें",
+        "अतिवृष्टि के खतरे वाले संवेदनशील क्षेत्र",
+        "आपातकालीन निकासी और सुरक्षा निर्देश",
+      ],
+    },
+    default: {
+      en: [
+        "Will it rain in the next 3 hours?",
+        "Hourly temperature & humidity trend",
+        "Should I carry an umbrella today?",
+        "What should I wear for this weather?",
+      ],
+      hi: [
+        "क्या अगले 3 घंटों में बारिश होगी?",
+        "प्रति घंटे तापमान और नमी का रुझान",
+        "क्या आज मुझे छाता साथ रखना चाहिए?",
+        "आज के मौसम के अनुसार क्या पहनना चाहिए?",
+      ],
+      mr: [
+        "पुढील ३ तासांत पाऊस पडेल का?",
+        "तासनिहाय तापमान व आर्द्रतेचा कल",
+        "आज छत्री सोबत ठेवावी का?",
+        "आजच्या हवामानानुसार काय कपडे घालावेत?",
+      ],
+      ta: [
+        "அடுத்த 3 மணி நேரத்தில் மழை பெய்யுமா?",
+        "மணிநேர வெப்பநிலை மற்றும் ஈரப்பதம்",
+        "இன்று நான் குடை எடுத்துச் செல்ல வேண்டுமா?",
+        "இந்த வானிலைக்கு என்ன உடை அணிய வேண்டும்?",
+      ],
+      te: [
+        "రాబోయే 3 గంటల్లో వర్షం పడుతుందా?",
+        "గంటల వారీగా ఉష్ణోగ్రత మరియు తేమ",
+        "ఈరోజు నేను గొడుగు తీసుకెళ్లాలా?",
+        "ఈ వాతావరణానికి ఎలాంటి దుస్తులు ధరించాలి?",
+      ],
+      bn: [
+        "আগামী ৩ ঘণ্টায় কি বৃষ্টি হবে?",
+        "ঘণ্টাভিত্তিক তাপমাত্রা ও আর্দ্রতা",
+        "আজ কি ছাতা সাথে রাখা উচিত?",
+        "এই আবহাওয়ায় কী ধরনের পোশাক পরা উচিত?",
+      ],
+      gu: [
+        "શું આગામી ૩ કલાકમાં વરસાદ પડશે?",
+        "કલાક મુજબ તાપમાન અને ભેજ",
+        "શું આજે છત્રી સાથે રાખવી જોઈએ?",
+        "આજના હવામાન માટે શું પહેરવું?",
+      ],
+      kn: [
+        "ಮುಂದಿನ ೩ ಗಂಟೆಗಳಲ್ಲಿ ಮಳೆಯಾಗುವುದೇ?",
+        "ಗಂಟೆಯವಾರು ತಾಪಮಾನ ಮತ್ತು ತೇವಾಂಶ",
+        "ಇಂದು ನಾನು ಛತ್ರಿ ತೆಗೆದುಕೊಂಡು ಹೋಗಬೇಕೆ?",
+        "ಈ ಹವಾಮಾನಕ್ಕೆ ಯಾವ ಬಟ್ಟೆ ಧರಿಸಬೇಕು?",
+      ],
+      pa: [
+        "ਕੀ ਅਗਲੇ ੩ ਘੰਟਿਆਂ ਵਿੱਚ ਮੀਂਹ ਪਵੇਗਾ?",
+        "ਘੰਟੇਵਾਰ ਤਾਪਮਾਨ ਅਤੇ ਨਮੀ ਦਾ ਰੁਝਾਨ",
+        "ਕੀ ਅੱਜ ਛੱਤਰੀ ਨਾਲ ਰੱਖਣੀ ਚਾਹੀਦੀ ਹੈ?",
+        "ਅੱਜ ਦੇ ਮੌਸਮ ਅਨੁਸਾਰ ਕੀ ਪਹਿਨਣਾ ਚਾਹੀਦਾ ਹੈ?",
+      ],
+      ml: [
+        "അടുത്ത 3 മണിക്കൂറിനുള്ളിൽ മഴ പെയ്യുമോ?",
+        "മണിക്കൂർ തോറുമുള്ള താപനില പ്രവണത",
+        "ഇന്ന് ഞാൻ കുട കരുതേണ്ടതുണ്ടോ?",
+        "ഈ കാലാവസ്ഥയ്ക്ക് എന്ത് വസ്ത്രം ധരിക്കണം?",
+      ],
+    },
+  };
+
+  const category = r.includes("farmer") ? "farmer" : r.includes("pilot") ? "pilot" : r.includes("disaster") ? "disaster" : "default";
+  const catPrompts = prompts[category] || prompts.default;
+  return catPrompts[lang] || catPrompts.en || prompts.default.en;
 }
 
 export default function ChatInputBar({
@@ -86,89 +218,99 @@ export default function ChatInputBar({
   isLoading = false,
   latestResponse,
   latestResponseCity,
-  role = "General Public",
-  currentDashboardCity = "Delhi",
-  isExpanded: controlledExpanded,
+  role = "Citizen",
+  currentDashboardCity = "Ghaziabad",
+  isExpanded = false,
   onToggleExpanded,
   onSwitchDashboardCity,
+  lang = "en",
 }: Props) {
-  const [value, setValue] = useState("");
   const [isOpen, setIsOpen] = useState(true);
-  const [internalExpanded, setInternalExpanded] = useState(false);
-  const [isListening, setIsListening] = useState(false);
+  const [expanded, setExpanded] = useState(isExpanded);
+  const [value, setValue] = useState("");
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [speakingMessageId, setSpeakingMessageId] = useState<string | null>(null);
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
+  const [isListening, setIsListening] = useState(false);
 
   const inputRef = useRef<HTMLInputElement>(null);
   const chatScrollRef = useRef<HTMLDivElement>(null);
+  const stopSpeechRef = useRef<(() => void) | null>(null);
 
-  const isExpanded = controlledExpanded !== undefined ? controlledExpanded : internalExpanded;
-  const setExpanded = (exp: boolean) => {
-    if (onToggleExpanded) {
-      onToggleExpanded(exp);
-    } else {
-      setInternalExpanded(exp);
-    }
+  const t = TRANSLATIONS[lang] || TRANSLATIONS.en;
+  const translatedRole = translateRole(role, lang);
+
+  // Sync external expansion trigger
+  useEffect(() => {
+    setExpanded(isExpanded);
+  }, [isExpanded]);
+
+  const setDrawerExpanded = (val: boolean) => {
+    setExpanded(val);
+    if (onToggleExpanded) onToggleExpanded(val);
   };
 
-  // Sync latest response into conversation history and auto-expand chat
+  // Sync latestResponse into chat stream
   useEffect(() => {
-    if (latestResponse) {
-      setMessages((prev) => {
-        const last = prev[prev.length - 1];
-        if (last && last.sender === "assistant" && last.text === latestResponse) {
-          return prev;
-        }
-        return [
-          ...prev,
-          {
-            id: crypto.randomUUID(),
-            sender: "assistant",
-            text: latestResponse,
-            timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-            role,
-            city: latestResponseCity,
-          },
-        ];
-      });
-      setExpanded(true);
-    }
-  }, [latestResponse, latestResponseCity, role]);
+    if (!latestResponse) return;
 
-  // Auto scroll chat to bottom
+    setMessages((prev) => {
+      const last = prev[prev.length - 1];
+      if (last && last.sender === "assistant" && last.text === latestResponse) {
+        return prev;
+      }
+      return [
+        ...prev,
+        {
+          id: crypto.randomUUID(),
+          sender: "assistant",
+          text: latestResponse,
+          timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+          role,
+          city: latestResponseCity || currentDashboardCity,
+        },
+      ];
+    });
+  }, [latestResponse, latestResponseCity, role, currentDashboardCity]);
+
+  // Auto-scroll chat history to bottom
   useEffect(() => {
-    if (isExpanded && chatScrollRef.current) {
+    if (expanded && chatScrollRef.current) {
       chatScrollRef.current.scrollTop = chatScrollRef.current.scrollHeight;
     }
-  }, [messages, isExpanded, isLoading]);
+  }, [messages, expanded, isLoading]);
 
-  // Text-To-Speech (TTS) Voice Reader
-  const toggleSpeech = useCallback((msgId: string, text: string) => {
-    if (!("speechSynthesis" in window)) {
-      alert("Text-to-speech is not supported in this browser.");
-      return;
-    }
+  // Stop speech when component unmounts
+  useEffect(() => {
+    return () => {
+      stopSpeech();
+    };
+  }, []);
 
-    if (speakingMessageId === msgId) {
-      window.speechSynthesis.cancel();
-      setSpeakingMessageId(null);
-      return;
-    }
+  // Text-To-Speech (TTS) Voice Reader with Native Regional Language
+  const toggleSpeech = useCallback(
+    (msgId: string, text: string) => {
+      if (speakingMessageId === msgId) {
+        stopSpeech();
+        setSpeakingMessageId(null);
+        return;
+      }
 
-    window.speechSynthesis.cancel();
-    // Clean markdown symbols for cleaner speech
-    const cleanText = text.replace(/[*#_`>]/g, "").replace(/\[.*?\]\(.*?\)/g, "");
-    const utterance = new SpeechSynthesisUtterance(cleanText);
-    utterance.rate = 1.0;
-    utterance.pitch = 1.0;
+      stopSpeech();
+      setSpeakingMessageId(msgId);
 
-    utterance.onend = () => setSpeakingMessageId(null);
-    utterance.onerror = () => setSpeakingMessageId(null);
+      const cancelFn = speakText(
+        text,
+        lang,
+        () => setSpeakingMessageId(msgId),
+        () => setSpeakingMessageId(null),
+        () => setSpeakingMessageId(null)
+      );
 
-    setSpeakingMessageId(msgId);
-    window.speechSynthesis.speak(utterance);
-  }, [speakingMessageId]);
+      stopSpeechRef.current = cancelFn;
+    },
+    [speakingMessageId, lang]
+  );
 
   // Copy message to clipboard
   const handleCopy = (msgId: string, text: string) => {
@@ -190,7 +332,7 @@ export default function ChatInputBar({
 
     const newMessages = [...messages, userMsg];
     setMessages(newMessages);
-    setExpanded(true);
+    setDrawerExpanded(true);
     setValue("");
 
     try {
@@ -219,15 +361,15 @@ export default function ChatInputBar({
 
   const handleClearChat = (e: React.MouseEvent) => {
     e.stopPropagation();
-    window.speechSynthesis?.cancel();
+    stopSpeech();
     setSpeakingMessageId(null);
     setMessages([]);
   };
 
-  // Speech-to-Text Voice Recognition
+  // Speech-to-Text Voice Recognition in Selected Language
   const handleVoiceInput = () => {
-    if (!("webkitSpeechRecognition" in window || "SpeechRecognition" in window)) {
-      alert("Speech recognition is not supported in this browser.");
+    if (typeof window === "undefined" || !("webkitSpeechRecognition" in window || "SpeechRecognition" in window)) {
+      alert(t.speechNotSupported || "Speech recognition is not supported in this browser.");
       return;
     }
 
@@ -235,7 +377,7 @@ export default function ChatInputBar({
       const SpeechRecognition =
         (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
       const recognition = new SpeechRecognition();
-      recognition.lang = "en-IN";
+      recognition.lang = LANGUAGE_LOCALE_MAP[lang] || "en-IN";
       recognition.interimResults = false;
 
       setIsListening(true);
@@ -256,7 +398,7 @@ export default function ChatInputBar({
     }
   };
 
-  const dynamicPrompts = getRoleBasedPrompts(role);
+  const dynamicPrompts = getRoleBasedPrompts(role, lang);
 
   if (!isOpen) {
     return (
@@ -264,7 +406,7 @@ export default function ChatInputBar({
         <button
           onClick={() => {
             setIsOpen(true);
-            setExpanded(true);
+            setDrawerExpanded(true);
             setTimeout(() => inputRef.current?.focus(), 100);
           }}
           aria-label="Open chat"
@@ -281,7 +423,7 @@ export default function ChatInputBar({
   return (
     <div className="w-full flex flex-col items-center gap-3">
       {/* Floating Chat History Modal / Drawer (Upward Expansion) */}
-      {isExpanded && (
+      {expanded && (
         <div
           className="w-full max-h-[410px] md:max-h-[500px] flex flex-col rounded-3xl
                      bg-black/95 backdrop-blur-3xl border border-yellow-400/35
@@ -295,10 +437,10 @@ export default function ChatInputBar({
               </div>
               <div>
                 <h3 className="text-xs font-bold font-mono tracking-tight text-white flex items-center gap-1.5">
-                  <span>WeatherGPT Conversational Intelligence</span>
+                  <span>{t.askWeatherGpt}</span>
                 </h3>
                 <p className="text-[10px] text-gray-400 font-mono">
-                  District & City Aware • Main: <span className="text-yellow-400 font-semibold">{currentDashboardCity}</span> • Role: {role}
+                  {t.activeLocation}: <span className="text-yellow-400 font-semibold">{currentDashboardCity}</span> • {translatedRole}
                 </p>
               </div>
             </div>
@@ -307,7 +449,7 @@ export default function ChatInputBar({
               {messages.length > 0 && (
                 <button
                   onClick={handleClearChat}
-                  title="Clear conversation"
+                  title={t.clearChat}
                   className="p-1.5 rounded-lg text-gray-400 hover:text-red-400 hover:bg-white/10 transition cursor-pointer"
                 >
                   <Trash2 className="w-4 h-4" />
@@ -315,43 +457,45 @@ export default function ChatInputBar({
               )}
               <button
                 onClick={() => {
-                  window.speechSynthesis?.cancel();
+                  stopSpeech();
                   setSpeakingMessageId(null);
-                  setExpanded(false);
+                  setDrawerExpanded(false);
                 }}
-                title="Minimize chat drawer"
-                className="p-1.5 rounded-lg text-gray-400 hover:text-yellow-400 hover:bg-white/10 transition cursor-pointer"
+                className="p-1.5 rounded-lg text-gray-400 hover:text-white hover:bg-white/10 transition cursor-pointer"
               >
                 <ChevronDown className="w-4 h-4" />
               </button>
             </div>
           </div>
 
-          {/* Messages Scroll Area */}
+          {/* Messages Stream */}
           <div
             ref={chatScrollRef}
-            className="flex-1 overflow-y-auto p-4 md:p-5 space-y-4 text-xs md:text-sm scrollbar-thin scrollbar-thumb-yellow-400/30"
+            className="flex-1 p-4 md:p-5 overflow-y-auto space-y-4 max-h-[300px] md:max-h-[380px] scrollbar-thin scrollbar-thumb-yellow-400/20"
           >
             {messages.length === 0 ? (
-              <div className="text-center py-6 space-y-3">
-                <div className="w-10 h-10 mx-auto rounded-full bg-yellow-400/15 border border-yellow-400/30 flex items-center justify-center text-yellow-400">
-                  <Bot className="w-5 h-5" />
+              <div className="py-6 text-center text-gray-400 space-y-3 font-mono">
+                <div className="w-12 h-12 rounded-2xl bg-yellow-400/10 border border-yellow-400/30 flex items-center justify-center mx-auto text-yellow-400 animate-pulse">
+                  <Sparkles className="w-6 h-6" />
                 </div>
-                <p className="text-xs text-gray-300 font-mono max-w-md mx-auto">
-                  Ask any question about districts, cities, rain timings, crop advisory, flight conditions, or alerts.
-                  Follow-ups remember previous context automatically.
-                </p>
+                <div className="space-y-1">
+                  <p className="text-xs md:text-sm font-bold text-white">
+                    {t.appTitle} — {t.appSubtitle}
+                  </p>
+                  <p className="text-[11px] text-gray-400 max-w-md mx-auto">
+                    {t.chatPlaceholder}
+                  </p>
+                </div>
 
-                {/* Role-tailored Suggested Prompt Chips */}
-                <div className="flex flex-wrap justify-center gap-2 pt-2 max-w-xl mx-auto">
-                  {dynamicPrompts.map((prompt, idx) => (
+                {/* Role Specific Dynamic Suggestion Chips */}
+                <div className="pt-2 flex flex-wrap items-center justify-center gap-1.5">
+                  {dynamicPrompts.map((p, idx) => (
                     <button
                       key={idx}
-                      onClick={() => handleSubmit(prompt)}
-                      className="text-[11px] font-mono px-3 py-1.5 rounded-full bg-black/60 border border-yellow-400/35 text-yellow-300 hover:bg-yellow-400/20 hover:text-yellow-200 transition cursor-pointer flex items-center gap-1.5"
+                      onClick={() => handleSubmit(p)}
+                      className="px-2.5 py-1 rounded-xl bg-gray-950/80 hover:bg-yellow-400/20 border border-white/10 hover:border-yellow-400/40 text-[10px] text-gray-300 hover:text-yellow-300 transition cursor-pointer text-left"
                     >
-                      <Zap className="w-3 h-3 text-yellow-400 shrink-0" />
-                      <span>{prompt}</span>
+                      {p}
                     </button>
                   ))}
                 </div>
@@ -360,15 +504,26 @@ export default function ChatInputBar({
               messages.map((msg) => (
                 <div
                   key={msg.id}
-                  className={`flex gap-3 ${
-                    msg.sender === "user" ? "justify-end" : "justify-start"
-                  }`}
+                  className={`flex flex-col ${msg.sender === "user" ? "items-end" : "items-start"}`}
                 >
-                  {msg.sender === "assistant" && (
-                    <div className="w-7 h-7 rounded-full bg-yellow-400/20 border border-yellow-400/40 flex items-center justify-center text-yellow-400 shrink-0 mt-0.5">
-                      <Bot className="w-3.5 h-3.5" />
-                    </div>
-                  )}
+                  {/* Sender Badge */}
+                  <div className="flex items-center gap-1 text-[10px] text-gray-400 font-mono mb-1 px-1">
+                    {msg.sender === "user" ? (
+                      <>
+                        <span>{t.roleCitizen}</span>
+                        <User className="w-3 h-3 text-yellow-400" />
+                      </>
+                    ) : (
+                      <>
+                        <Bot className="w-3 h-3 text-yellow-400" />
+                        <span className="text-yellow-400 font-bold">{t.appTitle} AI</span>
+                        {msg.city && (
+                          <span className="text-gray-400">• 📍 {msg.city}</span>
+                        )}
+                      </>
+                    )}
+                    <span>• {msg.timestamp}</span>
+                  </div>
 
                   <div
                     className={`max-w-[88%] rounded-2xl p-3.5 md:p-4 text-white shadow-md ${
@@ -385,14 +540,14 @@ export default function ChatInputBar({
                       <p className="font-mono text-xs md:text-sm font-medium text-white">{msg.text}</p>
                     )}
 
-                    {/* Bot Message Toolbar: Read Aloud, Copy, Action Chips */}
+                    {/* Bot Message Toolbar: Read Aloud in Native Language, Copy, Action Chips */}
                     {msg.sender === "assistant" && (
                       <div className="mt-3 pt-2.5 border-t border-white/10 flex flex-wrap items-center justify-between gap-2">
                         <div className="flex items-center gap-1.5">
                           {/* TTS Audio Speak Button */}
                           <button
                             onClick={() => toggleSpeech(msg.id, msg.text)}
-                            title={speakingMessageId === msg.id ? "Stop voice audio" : "Listen to weather audio"}
+                            title={speakingMessageId === msg.id ? t.stopAudio : t.listenAudio}
                             className={`p-1.5 rounded-lg border transition cursor-pointer flex items-center gap-1 text-[10px] font-mono ${
                               speakingMessageId === msg.id
                                 ? "bg-yellow-400 text-gray-950 border-yellow-400 font-bold"
@@ -402,12 +557,12 @@ export default function ChatInputBar({
                             {speakingMessageId === msg.id ? (
                               <>
                                 <VolumeX className="w-3.5 h-3.5" />
-                                <span>Stop</span>
+                                <span>{t.stopAudio}</span>
                               </>
                             ) : (
                               <>
                                 <Volume2 className="w-3.5 h-3.5 text-yellow-400" />
-                                <span>Listen</span>
+                                <span>{t.listenAudio}</span>
                               </>
                             )}
                           </button>
@@ -415,18 +570,18 @@ export default function ChatInputBar({
                           {/* Copy Button */}
                           <button
                             onClick={() => handleCopy(msg.id, msg.text)}
-                            title="Copy response"
+                            title={t.copy}
                             className="p-1.5 rounded-lg bg-black/40 border border-white/10 text-gray-300 hover:text-yellow-400 hover:border-yellow-400/40 transition cursor-pointer flex items-center gap-1 text-[10px] font-mono"
                           >
                             {copiedMessageId === msg.id ? (
                               <>
                                 <Check className="w-3.5 h-3.5 text-green-400" />
-                                <span className="text-green-400">Copied</span>
+                                <span className="text-green-400">{t.copied}</span>
                               </>
                             ) : (
                               <>
                                 <Copy className="w-3.5 h-3.5" />
-                                <span>Copy</span>
+                                <span>{t.copy}</span>
                               </>
                             )}
                           </button>
@@ -438,150 +593,85 @@ export default function ChatInputBar({
                           onSwitchDashboardCity && (
                             <button
                               onClick={() => onSwitchDashboardCity(msg.city!)}
-                              className="text-[10px] font-mono px-2.5 py-1 rounded-lg bg-yellow-400/15 hover:bg-yellow-400/30 border border-yellow-400/40 text-yellow-300 flex items-center gap-1 transition cursor-pointer"
+                              className="px-2 py-0.5 rounded-md bg-yellow-400/15 hover:bg-yellow-400/30 border border-yellow-400/40 text-yellow-300 hover:text-yellow-200 text-[10px] font-mono flex items-center gap-1 transition cursor-pointer"
                             >
-                              <MapPin className="w-3 h-3 text-yellow-400" />
-                              <span>Show {msg.city} on Dashboard</span>
+                              <MapPin className="w-2.5 h-2.5 text-yellow-400" />
+                              <span>{t.overview}: {msg.city}</span>
                             </button>
                           )}
                       </div>
                     )}
-
-                    <span className="block text-[9px] text-gray-500 font-mono mt-1.5 text-right">
-                      {msg.timestamp}
-                    </span>
                   </div>
-
-                  {msg.sender === "user" && (
-                    <div className="w-7 h-7 rounded-full bg-yellow-400/30 border border-yellow-400/50 flex items-center justify-center text-yellow-300 shrink-0 mt-0.5">
-                      <User className="w-3.5 h-3.5" />
-                    </div>
-                  )}
                 </div>
               ))
             )}
 
-            {/* Typing / Processing Indicator */}
+            {/* Loading Indicator */}
             {isLoading && (
-              <div className="flex gap-3 justify-start items-center">
-                <div className="w-7 h-7 rounded-full bg-yellow-400/20 border border-yellow-400/40 flex items-center justify-center text-yellow-400 shrink-0">
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                </div>
-                <div className="rounded-2xl rounded-bl-none p-3 bg-gray-950/80 border border-yellow-400/30 text-yellow-400 font-mono text-xs flex items-center gap-2">
-                  <span className="inline-block w-2 h-2 rounded-full bg-yellow-400 animate-pulse" />
-                  <span>Synthesizing live meteorological analysis...</span>
-                </div>
+              <div className="flex items-center gap-2 text-yellow-400 font-mono text-xs p-3 bg-yellow-400/10 border border-yellow-400/20 rounded-2xl w-fit">
+                <Loader2 className="w-4 h-4 animate-spin" />
+                <span>{t.appTitle} is thinking...</span>
               </div>
             )}
           </div>
-
-          {/* Quick Context Action Pills Bar at bottom of drawer */}
-          {messages.length > 0 && !isLoading && (
-            <div className="px-4 py-2 border-t border-white/10 bg-black/60 flex items-center gap-1.5 overflow-x-auto scrollbar-none">
-              <span className="text-[10px] font-mono text-gray-400 shrink-0">Quick follow-up:</span>
-              <button
-                onClick={() => handleSubmit("Will it rain in the next few hours?")}
-                className="text-[10px] font-mono px-2.5 py-1 rounded-lg bg-gray-900 border border-white/10 hover:border-yellow-400/40 text-gray-200 hover:text-yellow-300 transition shrink-0 flex items-center gap-1"
-              >
-                <CloudRain className="w-3 h-3 text-cyan-400" />
-                <span>Rain Forecast</span>
-              </button>
-              <button
-                onClick={() => handleSubmit("What about the wind speed and direction?")}
-                className="text-[10px] font-mono px-2.5 py-1 rounded-lg bg-gray-900 border border-white/10 hover:border-yellow-400/40 text-gray-200 hover:text-yellow-300 transition shrink-0 flex items-center gap-1"
-              >
-                <Wind className="w-3 h-3 text-yellow-400" />
-                <span>Wind Details</span>
-              </button>
-              <button
-                onClick={() => handleSubmit("Give me a 7-day weather trend summary")}
-                className="text-[10px] font-mono px-2.5 py-1 rounded-lg bg-gray-900 border border-white/10 hover:border-yellow-400/40 text-gray-200 hover:text-yellow-300 transition shrink-0 flex items-center gap-1"
-              >
-                <Calendar className="w-3 h-3 text-emerald-400" />
-                <span>7-Day Trend</span>
-              </button>
-            </div>
-          )}
         </div>
       )}
 
-      {/* Main Pill Chat Input Bar */}
+      {/* Persistent Bottom Modern Search / Query Input Bar */}
       <div
-        className="flex items-center gap-2.5 rounded-full
-                   bg-black/85 backdrop-blur-2xl border border-yellow-400/30
-                   px-4 md:px-5 py-2.5 md:py-3 shadow-2xl shadow-black/80 w-full transition-all focus-within:border-yellow-400/60 focus-within:bg-black/95"
+        className="w-full flex items-center gap-2 p-1.5 md:p-2 rounded-full
+                   bg-black/90 backdrop-blur-3xl border border-yellow-400/35
+                   shadow-2xl shadow-black/90 hover:border-yellow-400/50 transition-all font-mono"
       >
-        {/* Manual Chat Drawer Toggle Button */}
         <button
-          type="button"
-          onClick={() => setExpanded(!isExpanded)}
-          title={isExpanded ? "Collapse chat" : "Open chat conversation"}
-          className={`p-2 rounded-full transition-all cursor-pointer flex items-center justify-center ${
-            isExpanded
-              ? "bg-yellow-400/20 text-yellow-300 border border-yellow-400/40"
-              : "text-gray-400 hover:text-yellow-400 hover:bg-yellow-400/10"
-          }`}
+          onClick={() => setDrawerExpanded(!expanded)}
+          title={expanded ? t.minimize : t.expand}
+          className="p-2 md:p-2.5 rounded-full text-yellow-400 hover:bg-yellow-400/15 transition cursor-pointer shrink-0"
         >
-          <MessageSquare className="w-4 h-4" />
+          {expanded ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
         </button>
 
-        {/* Voice Input Button */}
+        <input
+          ref={inputRef}
+          type="text"
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !e.shiftKey) {
+              e.preventDefault();
+              handleSubmit();
+            }
+          }}
+          placeholder={isListening ? t.listening : t.chatPlaceholder}
+          disabled={isLoading}
+          className="flex-1 bg-transparent text-xs md:text-sm text-white placeholder-gray-400
+                     outline-none px-2 font-mono"
+        />
+
+        {/* Voice Input Mic Button */}
         <button
-          type="button"
           onClick={handleVoiceInput}
-          disabled={isListening || isLoading}
-          title="Voice prompt (speech to text)"
-          className={`p-2 rounded-full transition-all cursor-pointer ${
+          disabled={isLoading}
+          title={isListening ? t.listening : "Voice input"}
+          className={`p-2 md:p-2.5 rounded-full transition cursor-pointer shrink-0 ${
             isListening
-              ? "bg-red-500/30 text-red-300 animate-pulse"
-              : "text-gray-400 hover:text-yellow-400 hover:bg-yellow-400/10"
+              ? "bg-red-500/20 text-red-400 border border-red-500/50 animate-pulse"
+              : "text-gray-400 hover:text-yellow-400 hover:bg-white/10"
           }`}
         >
           <Mic className="w-4 h-4" />
         </button>
 
-        {/* Text Input */}
-        <input
-          ref={inputRef}
-          value={value}
-          onChange={(e) => setValue(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && handleSubmit()}
-          placeholder={
-            isListening
-              ? "Listening to your voice..."
-              : `Ask anything (e.g. 'Weather in Wayanad district', 'Will it rain tomorrow?')...`
-          }
-          className="flex-1 bg-transparent text-white placeholder-gray-500
-                     outline-none font-sans text-xs md:text-sm"
-        />
-
         {/* Send Button */}
         <button
-          type="button"
           onClick={() => handleSubmit()}
           disabled={!value.trim() || isLoading}
-          aria-label="Send query"
-          className="w-9 h-9 rounded-full bg-yellow-400 hover:bg-yellow-500 disabled:opacity-40 disabled:hover:bg-yellow-400 text-gray-950 font-bold flex items-center justify-center transition-all hover:scale-105 active:scale-95 cursor-pointer shrink-0 shadow-md shadow-yellow-400/20"
+          aria-label="Send message"
+          className="p-2 md:p-2.5 rounded-full bg-yellow-400 text-gray-950
+                     hover:bg-yellow-300 disabled:opacity-30 disabled:cursor-not-allowed
+                     transition-all cursor-pointer shrink-0 font-bold"
         >
-          {isLoading ? (
-            <Loader2 className="w-4 h-4 animate-spin text-gray-950" />
-          ) : (
-            <CornerDownLeft className="w-4 h-4 stroke-[2.5]" />
-          )}
-        </button>
-
-        {/* Collapse Button */}
-        <button
-          type="button"
-          onClick={() => {
-            window.speechSynthesis?.cancel();
-            setSpeakingMessageId(null);
-            setIsOpen(false);
-          }}
-          aria-label="Hide chat bar"
-          className="text-gray-500 hover:text-white transition text-xs p-1 cursor-pointer"
-        >
-          <X className="w-4 h-4" />
+          {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
         </button>
       </div>
     </div>

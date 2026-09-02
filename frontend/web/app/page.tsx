@@ -559,6 +559,7 @@ export default function Home() {
         city={dashboardWeather.city}
         days7={detailed7Days}
         days15={detailedDays15}
+        lang={selectedLanguage}
       />
 
       {/* Sector Decision Intelligence Modal */}
@@ -684,6 +685,7 @@ export default function Home() {
           isExpanded={isChatExpanded}
           onToggleExpanded={toggleChatDrawer}
           onSwitchDashboardCity={(city) => handleSelectDashboardLocation(city)}
+          lang={selectedLanguage}
         />
       </div>
     </main>
