@@ -181,7 +181,13 @@ class LLMService:
             timeout=self.timeout
         )
 
-        return response.choices[0].message.content
+        raw_content = response.choices[0].message.content or ""
+        import re
+        clean_content = re.sub(r'<think>[\s\S]*?</think>', '', raw_content, flags=re.IGNORECASE)
+        clean_content = re.sub(r'<think>[\s\S]*$', '', clean_content, flags=re.IGNORECASE)
+        clean_content = re.sub(r'\[think(?:ing)?\][\s\S]*?\[\/think(?:ing)?\]', '', clean_content, flags=re.IGNORECASE)
+        clean_content = re.sub(r'\[think(?:ing)?\][\s\S]*$', '', clean_content, flags=re.IGNORECASE).strip()
+        return clean_content
 
     def get_tier_info(self) -> Dict[str, Any]:
         """Get information about configured tiers."""
