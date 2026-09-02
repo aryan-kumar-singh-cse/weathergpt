@@ -290,10 +290,23 @@ export default function Home() {
     lng: undefined,
   });
 
+  const dashboardWeatherRef = useRef(dashboardWeather);
+  useEffect(() => {
+    dashboardWeatherRef.current = dashboardWeather;
+  }, [dashboardWeather]);
+
+  const userRealLocationRef = useRef(userRealLocation);
+  useEffect(() => {
+    userRealLocationRef.current = userRealLocation;
+  }, [userRealLocation]);
+
   // 2. Multi-Turn Conversational Chat Handler (Independent of Dashboard Searchbar)
   const handleChatSend = useCallback(
     async (message: string, history?: ChatMessage[]) => {
       setIsChatLoading(true);
+
+      const currentDash = dashboardWeatherRef.current;
+      const currentGPS = userRealLocationRef.current;
 
       const formattedHistory = (history || []).map((m) => ({
         role: m.sender === "assistant" ? "assistant" : "user",
@@ -308,12 +321,12 @@ export default function Home() {
             message,
             occupation: preferences.occupation,
             language: selectedLanguage,
-            dashboardLocation: dashboardWeather.city,
-            dashboardLat: dashboardWeather.lat,
-            dashboardLng: dashboardWeather.lng,
-            userLocation: userRealLocation.lat ? userRealLocation.city : dashboardWeather.city,
-            userLat: userRealLocation.lat ?? dashboardWeather.lat,
-            userLng: userRealLocation.lng ?? dashboardWeather.lng,
+            dashboardLocation: currentDash.city,
+            dashboardLat: currentDash.lat,
+            dashboardLng: currentDash.lng,
+            userLocation: currentGPS.lat ? currentGPS.city : currentDash.city,
+            userLat: currentGPS.lat ?? currentDash.lat,
+            userLng: currentGPS.lng ?? currentDash.lng,
             history: formattedHistory,
           }),
         });
@@ -332,7 +345,7 @@ export default function Home() {
         setIsChatLoading(false);
       }
     },
-    [preferences.occupation, selectedLanguage, userRealLocation]
+    [preferences.occupation, selectedLanguage, dashboardWeather, userRealLocation]
   );
 
   // 3. Live GPS Geolocation Auto-Detection Trigger

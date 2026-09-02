@@ -462,7 +462,8 @@ const NON_LOCATION_STOPWORDS = new Set([
   "weather", "climate", "humidity", "wind", "umbrella", "clothes", "car", "wash",
   "farming", "paddy", "sugarcane", "fertilizer", "pesticide", "storm", "lightning",
   "thunder", "aqi", "air", "quality", "here", "there", "my area", "this place",
-  "india", "current", "future", "overview", "status", "conditions", "sky", "safe"
+  "india", "current", "future", "overview", "status", "conditions", "sky", "safe",
+  "current location", "my location", "my current location", "location", "place", "my city", "current city"
 ]);
 
 // Extract specific target city if user asks about a location
