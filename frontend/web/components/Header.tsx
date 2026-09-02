@@ -73,21 +73,23 @@ export default function Header({
           }}
           className="flex items-center gap-3 shrink-0 cursor-pointer group"
         >
-          <img
-            src="/logo.png"
-            alt="WeatherGPT Logo"
-            className="h-11 sm:h-12 md:h-14 w-auto max-w-[160px] md:max-w-[200px] object-contain drop-shadow-[0_2px_16px_rgba(250,204,21,0.35)] transition-transform group-hover:scale-105"
-          />
-          <div className="hidden lg:flex flex-col">
-            <div className="flex items-center gap-1.5">
-              <span className="text-sm md:text-base font-extrabold tracking-tight text-white font-mono leading-none">
+          <div className="w-10 h-10 md:w-12 md:h-12 rounded-2xl bg-gradient-to-br from-yellow-400 via-amber-500 to-yellow-600 p-[1.5px] shadow-xl shadow-yellow-500/25 group-hover:scale-105 group-hover:shadow-yellow-400/40 transition-all">
+            <div className="w-full h-full bg-black/95 rounded-[14px] flex items-center justify-center relative overflow-hidden">
+              <div className="absolute inset-0 bg-yellow-400/15 blur-sm" />
+              <Cloud className="w-6 h-6 text-yellow-400 relative z-10 fill-yellow-400/20" />
+            </div>
+          </div>
+
+          <div className="flex flex-col justify-center">
+            <div className="flex items-center gap-2">
+              <span className="text-lg md:text-2xl font-black tracking-tight text-white font-mono leading-none">
                 Weather<span className="text-yellow-400">GPT</span>
               </span>
-              <span className="px-1.5 py-0.5 rounded text-[8px] font-bold bg-yellow-400/20 border border-yellow-400/40 text-yellow-300 uppercase tracking-wider font-mono">
-                v2.0
+              <span className="px-1.5 py-0.5 rounded text-[9px] font-black bg-yellow-400 text-gray-950 uppercase tracking-wider font-mono">
+                PRO
               </span>
             </div>
-            <span className="text-[9px] text-gray-400 font-mono tracking-wider truncate max-w-[140px]">
+            <span className="text-[10px] md:text-[11px] text-gray-400 font-mono tracking-wider">
               {t.appSubtitle}
             </span>
           </div>
