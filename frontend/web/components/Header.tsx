@@ -66,13 +66,31 @@ export default function Header({
   return (
     <>
       <header className="relative z-30 flex items-center justify-between gap-3 md:gap-6 px-4 md:px-8 py-3 w-full bg-black/70 backdrop-blur-2xl border-b border-white/5 shrink-0 select-none">
-        {/* Left: Brand Logo & Tagline (Frameless) */}
-        <div className="flex items-center gap-3 shrink-0 cursor-pointer">
+        {/* Left: Brand Logo & Title */}
+        <div
+          onClick={() => {
+            if (typeof window !== "undefined") window.location.reload();
+          }}
+          className="flex items-center gap-3 shrink-0 cursor-pointer group"
+        >
           <img
             src="/logo.png"
             alt="WeatherGPT Logo"
-            className="h-9 md:h-10 w-auto object-contain drop-shadow-[0_2px_12px_rgba(250,204,21,0.25)]"
+            className="h-11 sm:h-12 md:h-14 w-auto max-w-[160px] md:max-w-[200px] object-contain drop-shadow-[0_2px_16px_rgba(250,204,21,0.35)] transition-transform group-hover:scale-105"
           />
+          <div className="hidden lg:flex flex-col">
+            <div className="flex items-center gap-1.5">
+              <span className="text-sm md:text-base font-extrabold tracking-tight text-white font-mono leading-none">
+                Weather<span className="text-yellow-400">GPT</span>
+              </span>
+              <span className="px-1.5 py-0.5 rounded text-[8px] font-bold bg-yellow-400/20 border border-yellow-400/40 text-yellow-300 uppercase tracking-wider font-mono">
+                v2.0
+              </span>
+            </div>
+            <span className="text-[9px] text-gray-400 font-mono tracking-wider truncate max-w-[140px]">
+              {t.appSubtitle}
+            </span>
+          </div>
         </div>
 
         {/* Center-Left: Global Device-Native Search Bar */}
