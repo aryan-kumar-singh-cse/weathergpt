@@ -256,6 +256,7 @@ export default function LocationSearchBar({
           onFocus={() => setIsOpen(true)}
           onKeyDown={handleKeyDown}
           placeholder="Search district, city, state, or country..."
+          aria-label="Search district, city, state, or country"
           className="flex-1 bg-transparent text-white placeholder-gray-500 text-xs font-mono outline-none"
         />
 
@@ -267,6 +268,7 @@ export default function LocationSearchBar({
               setResults([]);
               inputRef.current?.focus();
             }}
+            aria-label="Clear search query"
             className="text-gray-400 hover:text-white p-1 rounded-full cursor-pointer transition"
           >
             <X className="w-3.5 h-3.5" />
@@ -337,10 +339,14 @@ export default function LocationSearchBar({
                   <p>No locations found matching &quot;{query}&quot;.</p>
                   <button
                     onClick={() => {
-                      onSelectCity(query.trim());
-                      setIsOpen(false);
-                      setQuery("");
+                      if (query.trim()) {
+                        onSelectCity(query.trim());
+                        setIsOpen(false);
+                        setQuery("");
+                        setResults([]);
+                      }
                     }}
+                    aria-label={`Search weather for ${query.trim()}`}
                     className="mt-2 text-xs font-mono text-yellow-400 hover:underline"
                   >
                     Search WeatherGPT for &quot;{query.trim()}&quot; ↵

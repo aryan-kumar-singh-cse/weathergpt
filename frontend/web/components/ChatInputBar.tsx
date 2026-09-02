@@ -28,6 +28,17 @@ import ReactMarkdown from "react-markdown";
 import { SupportedLanguage, TRANSLATIONS, translateRole } from "@/lib/translations";
 import { speakText, stopSpeech, LANGUAGE_LOCALE_MAP } from "@/lib/tts";
 
+export function stripInternalThinking(text: string): string {
+  if (!text) return "";
+  return text
+    .replace(/<think>[\s\S]*?<\/think>/gi, "")
+    .replace(/<think>[\s\S]*$/gi, "")
+    .replace(/\[think(?:ing)?\][\s\S]*?\[\/think(?:ing)?\]/gi, "")
+    .replace(/\[think(?:ing)?\][\s\S]*$/gi, "")
+    .replace(/^Thinking Process:[\s\S]*?(?=\n\n|\n[#A-Z])/gi, "")
+    .trim();
+}
+
 export type ChatMessage = {
   id: string;
   sender: "user" | "assistant";
@@ -253,10 +264,12 @@ export default function ChatInputBar({
   // Sync latestResponse into chat stream
   useEffect(() => {
     if (!latestResponse) return;
+    const cleanResponse = stripInternalThinking(latestResponse);
+    if (!cleanResponse) return;
 
     setMessages((prev) => {
       const last = prev[prev.length - 1];
-      if (last && last.sender === "assistant" && last.text === latestResponse) {
+      if (last && last.sender === "assistant" && last.text === cleanResponse) {
         return prev;
       }
       return [
@@ -264,7 +277,7 @@ export default function ChatInputBar({
         {
           id: crypto.randomUUID(),
           sender: "assistant",
-          text: latestResponse,
+          text: cleanResponse,
           timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
           role,
           city: latestResponseCity || currentDashboardCity,
@@ -336,7 +349,8 @@ export default function ChatInputBar({
     setValue("");
 
     try {
-      const responseText = await onSend(query, newMessages);
+      const rawResponse = await onSend(query, newMessages);
+      const responseText = stripInternalThinking(rawResponse || "");
       if (responseText) {
         setMessages((prev) => {
           const last = prev[prev.length - 1];
@@ -534,7 +548,7 @@ export default function ChatInputBar({
                   >
                     {msg.sender === "assistant" ? (
                       <div className="prose prose-invert prose-xs md:prose-sm max-w-none leading-relaxed space-y-2 text-gray-200">
-                        <ReactMarkdown>{msg.text}</ReactMarkdown>
+                        <ReactMarkdown>{stripInternalThinking(msg.text)}</ReactMarkdown>
                       </div>
                     ) : (
                       <p className="font-mono text-xs md:text-sm font-medium text-white">{msg.text}</p>
@@ -546,8 +560,9 @@ export default function ChatInputBar({
                         <div className="flex items-center gap-1.5">
                           {/* TTS Audio Speak Button */}
                           <button
-                            onClick={() => toggleSpeech(msg.id, msg.text)}
+                            onClick={() => toggleSpeech(msg.id, stripInternalThinking(msg.text))}
                             title={speakingMessageId === msg.id ? t.stopAudio : t.listenAudio}
+                            aria-label={speakingMessageId === msg.id ? "Stop voice audio" : "Listen voice audio"}
                             className={`p-1.5 rounded-lg border transition cursor-pointer flex items-center gap-1 text-[10px] font-mono ${
                               speakingMessageId === msg.id
                                 ? "bg-yellow-400 text-gray-950 border-yellow-400 font-bold"
@@ -569,8 +584,9 @@ export default function ChatInputBar({
 
                           {/* Copy Button */}
                           <button
-                            onClick={() => handleCopy(msg.id, msg.text)}
+                            onClick={() => handleCopy(msg.id, stripInternalThinking(msg.text))}
                             title={t.copy}
+                            aria-label="Copy response"
                             className="p-1.5 rounded-lg bg-black/40 border border-white/10 text-gray-300 hover:text-yellow-400 hover:border-yellow-400/40 transition cursor-pointer flex items-center gap-1 text-[10px] font-mono"
                           >
                             {copiedMessageId === msg.id ? (
@@ -589,10 +605,12 @@ export default function ChatInputBar({
 
                         {/* Action chip if response discusses another location */}
                         {msg.city &&
-                          msg.city.toLowerCase() !== currentDashboardCity.toLowerCase() &&
+                          currentDashboardCity &&
+                          msg.city.trim().toLowerCase() !== currentDashboardCity.trim().toLowerCase() &&
                           onSwitchDashboardCity && (
                             <button
                               onClick={() => onSwitchDashboardCity(msg.city!)}
+                              aria-label={`Switch dashboard to ${msg.city}`}
                               className="px-2 py-0.5 rounded-md bg-yellow-400/15 hover:bg-yellow-400/30 border border-yellow-400/40 text-yellow-300 hover:text-yellow-200 text-[10px] font-mono flex items-center gap-1 transition cursor-pointer"
                             >
                               <MapPin className="w-2.5 h-2.5 text-yellow-400" />
@@ -626,6 +644,7 @@ export default function ChatInputBar({
         <button
           onClick={() => setDrawerExpanded(!expanded)}
           title={expanded ? t.minimize : t.expand}
+          aria-label={expanded ? "Minimize chat drawer" : "Expand chat drawer"}
           className="p-2 md:p-2.5 rounded-full text-yellow-400 hover:bg-yellow-400/15 transition cursor-pointer shrink-0"
         >
           {expanded ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
@@ -639,13 +658,15 @@ export default function ChatInputBar({
           onKeyDown={(e) => {
             if (e.key === "Enter" && !e.shiftKey) {
               e.preventDefault();
-              handleSubmit();
+              if (!isLoading && value.trim()) {
+                handleSubmit();
+              }
             }
           }}
-          placeholder={isListening ? t.listening : t.chatPlaceholder}
+          placeholder={isLoading ? "Generating response..." : isListening ? t.listening : t.chatPlaceholder}
           disabled={isLoading}
           className="flex-1 bg-transparent text-xs md:text-sm text-white placeholder-gray-400
-                     outline-none px-2 font-mono"
+                     outline-none px-2 font-mono disabled:opacity-50"
         />
 
         {/* Voice Input Mic Button */}
@@ -653,6 +674,7 @@ export default function ChatInputBar({
           onClick={handleVoiceInput}
           disabled={isLoading}
           title={isListening ? t.listening : "Voice input"}
+          aria-label="Voice input"
           className={`p-2 md:p-2.5 rounded-full transition cursor-pointer shrink-0 ${
             isListening
               ? "bg-red-500/20 text-red-400 border border-red-500/50 animate-pulse"

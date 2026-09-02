@@ -501,7 +501,7 @@ export default function Home() {
           else if (opt === "radar") setIsRadarOpen(true);
           else if (opt === "bulletin") setIsBulletinOpen(true);
           else if (opt === "climate") setIsClimateOpen(true);
-          else if (opt === "emergency") handleChatSend(`Are there any weather alerts or risks for ${loc}?`);
+          else if (opt === "emergency") setIsDisasterOpen(true);
         }}
       />
 

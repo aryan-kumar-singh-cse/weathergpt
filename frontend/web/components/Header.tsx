@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import SettingsPanel, { Preferences } from "./SettingsPanel";
 import LocationSearchBar from "./LocationSearchBar";
 import {
@@ -59,6 +59,34 @@ export default function Header({
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [langDropdownOpen, setLangDropdownOpen] = useState(false);
   const [toolsDropdownOpen, setToolsDropdownOpen] = useState(false);
+
+  const langContainerRef = useRef<HTMLDivElement>(null);
+  const toolsContainerRef = useRef<HTMLDivElement>(null);
+
+  // Close dropdowns on outside click or Escape key
+  useEffect(() => {
+    const handlePointerDown = (e: MouseEvent) => {
+      if (langContainerRef.current && !langContainerRef.current.contains(e.target as Node)) {
+        setLangDropdownOpen(false);
+      }
+      if (toolsContainerRef.current && !toolsContainerRef.current.contains(e.target as Node)) {
+        setToolsDropdownOpen(false);
+      }
+    };
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setLangDropdownOpen(false);
+        setToolsDropdownOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handlePointerDown);
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", handlePointerDown);
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, []);
 
   const t = TRANSLATIONS[selectedLanguage] || TRANSLATIONS.en;
   const currentLangObj = LANGUAGE_OPTIONS.find((l) => l.code === selectedLanguage) || LANGUAGE_OPTIONS[0];
@@ -167,9 +195,11 @@ export default function Header({
           </button>
 
           {/* Quick Tools Dropdown for non-2xl viewports */}
-          <div className="relative">
+          <div ref={toolsContainerRef} className="relative">
             <button
               onClick={() => setToolsDropdownOpen(!toolsDropdownOpen)}
+              aria-label="More operational tools"
+              aria-expanded={toolsDropdownOpen}
               className="p-1.5 text-gray-300 hover:text-yellow-300 transition cursor-pointer"
             >
               <MoreHorizontal className="w-4 h-4" />
@@ -230,6 +260,7 @@ export default function Header({
               onClick={onManualRefresh}
               disabled={isRefreshing}
               title="Live auto-refresh active. Click to sync fresh telemetry."
+              aria-label="Refresh telemetry data"
               className="hidden sm:flex items-center gap-1.5 py-1 px-1.5 text-[11px] font-sans text-gray-300 hover:text-white transition cursor-pointer"
             >
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping shrink-0" />
@@ -240,9 +271,11 @@ export default function Header({
           )}
 
           {/* Vernacular Language Selector Dropdown */}
-          <div className="relative">
+          <div ref={langContainerRef} className="relative">
             <button
               onClick={() => setLangDropdownOpen(!langDropdownOpen)}
+              aria-label="Select vernacular language"
+              aria-expanded={langDropdownOpen}
               className="py-1 px-2 text-white font-sans text-xs flex items-center gap-1.5 transition cursor-pointer hover:text-yellow-300"
             >
               <span>{currentLangObj.flag}</span>
@@ -251,7 +284,7 @@ export default function Header({
             </button>
 
             {langDropdownOpen && (
-              <div className="absolute right-0 mt-2 w-44 rounded-2xl bg-black/95 backdrop-blur-2xl border border-yellow-400/30 shadow-2xl p-1.5 z-50 animate-fade-in font-sans text-xs">
+              <div className="absolute right-0 mt-2 w-48 max-w-[calc(100vw-2rem)] rounded-2xl bg-black/95 backdrop-blur-2xl border border-yellow-400/30 shadow-2xl p-1.5 z-50 animate-fade-in font-sans text-xs max-h-80 overflow-y-auto">
                 <div className="px-2 py-1 text-[9px] uppercase tracking-wider text-gray-400 border-b border-white/10 mb-1 font-heading">
                   Select Vernacular
                 </div>
